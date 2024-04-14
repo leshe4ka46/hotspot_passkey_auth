@@ -6,6 +6,7 @@ const MacUserLifetime = 1 //min
 const CookieLifeTime = 3600
 const LoginCookieName = "loginCookie"
 const CookieDomain = "localhost"
+const SecureCookie = false
 
 const apiPath = "/api"
 const LoginPath = apiPath + "/login"
