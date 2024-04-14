@@ -43,6 +43,7 @@ func AttestationGet(database *gorm.DB, wba *webauthn.WebAuthn, config *Config, u
 			c.JSON(404, gin.H{"error": "Not found"})
 			return
 		}
+		opts.Response.AuthenticatorSelection.AuthenticatorAttachment="none"
 		db_user.Webauthn = JSONString(data)
 		db_user.WebauthnUser = JSONString(user)
 		db.UpdateUser(database,db_user)
