@@ -98,7 +98,7 @@ func UpdateUser(db *gorm.DB, gocheck Gocheck) (err error) {
 }
 
 func GetUserByCookie(db *gorm.DB, cookie string) (gocheck Gocheck, err error) {
-	err = db.Where("strpos(cookies,?)>0", cookie).First(&gocheck).Error
+	err = db.Where("cookies = ?", cookie).First(&gocheck).Error
 	return
 }
 
