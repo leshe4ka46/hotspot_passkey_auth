@@ -28,20 +28,15 @@ func NoKeysHandler(database *gorm.DB) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		cookie, err := c.Cookie(consts.LoginCookieName)
 		if err != nil {
-			c.JSON(404, gin.H{"error": "User not found"})
+			c.JSON(404, gin.H{"error": "Cookie get err"})
 			return
 		}
-		_, err = db.GetUserByCookie(database, cookie)
+		db_user, err := db.GetUserByCookie(database, cookie)
 		if err != nil {
-			c.JSON(404, gin.H{"error": "User not found"})
+			c.JSON(404, gin.H{"error": "DB err"})
 			return
 		}
-		mac, err := getMacFromCookie(cookie)
-		if err != nil {
-			c.JSON(404, gin.H{"error": "User not found"})
-			return
-		}
-		db.AddUserMac(database, mac)
+		db.AddUserMac(database, db_user.Mac)
 		c.JSON(200, gin.H{"status": "OK"})
 	}
 	return gin.HandlerFunc(fn)

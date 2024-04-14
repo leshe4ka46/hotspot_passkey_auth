@@ -1,14 +1,24 @@
 package main
 
 import (
-	_"fmt"
 	"hotspot_passkey_auth/db"
 	"hotspot_passkey_auth/server"
+	"hotspot_passkey_auth/wa"
 	"log"
+	"net/url"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
+	"gorm.io/gorm"
 )
+
+func ExpireUsers(database *gorm.DB){
+	for {
+		db.ExpireMacUsers(database)
+		time.Sleep(60*time.Second)
+	}
+}
 
 func main() {
 	err := godotenv.Load(".env")
@@ -20,7 +30,24 @@ func main() {
 		panic(err)
 	}
 	database.AutoMigrate(&db.Gocheck{})
-	r := server.InitServer(database)
+	database.AutoMigrate(&db.Radcheck{})
+
+	url, err:= url.Parse(os.Getenv("WEBAUTHN_EXTERNAL_URL"))
+	if err!=nil{
+		panic(err)
+	}
+	config:=wa.Config{
+		DisplayName:os.Getenv("WEBAUTHN_DISPLAY_NAME"),
+		RPID:os.Getenv("WEBAUTHN_RPID"),
+		ExternalURL: *url,
+		ConveyancePreference: wa.ParceAttestationPreference(os.Getenv("WEBAUTHN_CONVEYANCE_PREFERENCE")),
+	}
+	webauthn, err := wa.InitWebauthn(config)
+	if err!=nil{
+		panic(err)
+	}
+	r := server.InitServer(database, webauthn, &config)
+	go ExpireUsers(database)
 	server.StartServer(r)
 }
 

@@ -41,13 +41,15 @@ func LoginHandler(database *gorm.DB) gin.HandlerFunc {
 			return
 		}
 		fmt.Printf("%+v\n",user);
-		cookie := hexSha256(user.Username,user.Password,login.Mac)
-		err=db.AddUserCookieAndMac(database, user, cookie, login.Mac)
-		if err!=nil{
-			fmt.Println("Error: ",err)
+		cookie, err := c.Cookie(consts.LoginCookieName)
+		if err != nil {
+			c.JSON(404, gin.H{"error": "User not found"})
+			return
 		}
-		c.SetCookie(consts.LoginCookieName, cookie, consts.CookieLifeTime, "/", consts.CookieDomain, false, true)
-		fmt.Println("Cookie: ", cookie)
+		user.Cookies = cookie
+		user.Mac = login.Mac
+		db.UpdateUser(database, user)
+		database.Delete(&db.Gocheck{}, "username = '' AND Cookies=?", cookie)
 		c.JSON(200, gin.H{"status": login.Username})
 	}
 	return gin.HandlerFunc(fn)

@@ -2,13 +2,18 @@ package server
 
 import (
 	_ "fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/rs/cors"
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/handlers"
+	"hotspot_passkey_auth/store"
+	"hotspot_passkey_auth/wa"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/go-webauthn/webauthn/webauthn"
+
+	"github.com/gin-gonic/gin"
+	"github.com/rs/cors"
 	"gorm.io/gorm"
 )
 
@@ -21,7 +26,9 @@ func staticCacheMiddleware() gin.HandlerFunc {
 	}
 }
 
-func InitServer(database *gorm.DB) *gin.Engine {
+func InitServer(database *gorm.DB, wba *webauthn.WebAuthn, cfg *wa.Config) *gin.Engine {
+	var userProvider = store.NewSessionProvider()
+
 	var router = gin.Default()
 	router.Use(staticCacheMiddleware())
 	router.StaticFile("/", "./dist/index.html")
@@ -32,10 +39,16 @@ func InitServer(database *gorm.DB) *gin.Engine {
 	router.StaticFile("/logo192.png", "./dist/logo192.png")
 	router.StaticFile("/logo512.png", "./dist/logo512.png")
 
-	router.GET(consts.InfoPath, handlers.InfoHandler(database))
+	router.GET(consts.InfoPath, handlers.InfoHandler(database, userProvider))
 	router.POST(consts.LoginPath, handlers.LoginHandler(database))
+	router.GET(consts.LogoutPath, handlers.LogoutHandler)
 	router.POST(consts.LoginWithoutKeysPath, handlers.NoKeysHandler(database))
 
+	router.GET(consts.AttestationPath, wa.AttestationGet(database, wba, cfg, userProvider))
+	router.POST(consts.AttestationPath, wa.AttestationPost(database, wba, cfg, userProvider))
+
+	router.GET(consts.AssertionPath, wa.AssertionGet(database, wba, cfg, userProvider))
+	router.POST(consts.AssertionPath, wa.AssertionPost(database, wba, cfg, userProvider))
 
 	return router
 }
