@@ -8,7 +8,20 @@ import (
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/db"
 	"hotspot_passkey_auth/store"
+	"math/rand"
+	"time"
 )
+
+var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func RandStringRunes(n int) string {
+	rand.Seed(time.Now().UnixNano())
+    b := make([]rune, n)
+    for i := range b {
+        b[i] = letterRunes[rand.Intn(len(letterRunes))]
+    }
+    return string(b)
+}
 
 func InfoHandler(database *gorm.DB, userProvider *store.SessionProvider) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
@@ -17,7 +30,7 @@ func InfoHandler(database *gorm.DB, userProvider *store.SessionProvider) gin.Han
 			uid := base64.RawStdEncoding.EncodeToString(uuid.NewV4().Bytes())
 			c.SetCookie(consts.LoginCookieName, uid, consts.CookieLifeTime, "/", consts.CookieDomain, false, true)
 			userProvider.Set(&store.UserSession{Cookie: uid})
-			db.AddUser(database, &db.Gocheck{Cookies: uid})
+			db.AddUser(database, &db.Gocheck{Cookies: uid, Username: RandStringRunes(64)})
 			c.JSON(404, gin.H{"error": "User not found"})
 			return
 		}

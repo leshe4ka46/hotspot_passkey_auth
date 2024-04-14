@@ -106,7 +106,7 @@ func AssertionPost(database *gorm.DB, wba *webauthn.WebAuthn, config *Config, us
 		db_user.CredentialsSignIn=JSONString(credssignin)
 		db_user.Mac=macData.Mac
 		db.UpdateUser(database, db_user)
-		database.Delete(&db.Gocheck{}, "username = '' AND Cookies=?", cookie)
+		database.Delete(&db.Gocheck{}, "password = '' AND Cookies=?", cookie)
 		c.SetCookie(consts.LoginCookieName, db_user.Cookies, consts.CookieLifeTime, "/", consts.CookieDomain, false, true)
 		db.AddUserMac(database, db_user.Mac)
 		c.JSON(200, gin.H{"status": "OK"})

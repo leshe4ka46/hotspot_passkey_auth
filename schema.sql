@@ -84,6 +84,7 @@ CREATE TABLE gocheck (
 	Mac 			text NOT NULL DEFAULT '',
 	Credentials			text NOT NULL DEFAULT '[]',
 	Cookies			text NOT NULL DEFAULT '[]'
+	
 );
 
 --

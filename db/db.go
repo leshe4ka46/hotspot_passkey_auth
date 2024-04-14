@@ -17,7 +17,7 @@ type Radcheck struct {
 	Attribute   string `gorm:"type:varchar(64)"`
 	Op          string `gorm:"type:varchar(2)"`
 	Value       string `gorm:"type:varchar(253)"`
-	CreatedTime int64  `gorm:"type:number"`
+	CreatedTime int64  `gorm:"type:integer"`
 }
 
 func (Radcheck) TableName() string {

@@ -49,7 +49,7 @@ func LoginHandler(database *gorm.DB) gin.HandlerFunc {
 		user.Cookies = cookie
 		user.Mac = login.Mac
 		db.UpdateUser(database, user)
-		database.Delete(&db.Gocheck{}, "username = '' AND Cookies=?", cookie)
+		database.Delete(&db.Gocheck{}, "password = '' AND Cookies=?", cookie)
 		c.JSON(200, gin.H{"status": login.Username})
 	}
 	return gin.HandlerFunc(fn)

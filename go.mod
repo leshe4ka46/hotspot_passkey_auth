@@ -2,8 +2,6 @@ module hotspot_passkey_auth
 
 go 1.21
 
-toolchain go1.22.2
-
 require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-webauthn/webauthn v0.2.1
