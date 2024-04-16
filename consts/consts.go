@@ -1,12 +1,14 @@
 package consts
 
+import "os"
+
 const MacUserLifetime = 1 //min
 
 const DistPath = "/home/alex/go-webauthn-example/front/build/"
 
-const CookieLifeTime = 3600
+var CookieLifeTime = os.Getenv("COOKIE_LIFETIME")
 const LoginCookieName = "loginCookie"
-const CookieDomain = "localhost"
+var CookieDomain = os.Getenv("COOKIE_DOMAIN")
 const SecureCookie = false
 
 const apiPath = "/api"
