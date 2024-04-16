@@ -9,7 +9,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
