@@ -14,7 +14,7 @@ func toInt(s string) (i int) {
 
 var CookieLifeTime = toInt(os.Getenv("COOKIE_LIFETIME"))
 
-var MacUserLifetime = toInt(os.Getenv("RADCHECK_LIFETIME"))
+var MacUserLifetime = int64(toInt(os.Getenv("RADCHECK_LIFETIME")))
 
 const LoginCookieName = "loginCookie"
 
