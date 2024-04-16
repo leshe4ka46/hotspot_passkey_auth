@@ -1,0 +1,48 @@
+[
+  {
+    "publicKey": {
+      "rp": {
+        "name": "Wifi auth",
+        "id": "auth.leshe4ka.ru"
+      },
+      "user": {
+        "name": "leshe4ka",
+        "displayName": "leshe4ka",
+        "id": "bGVzaGU0a2E="
+      },
+      "authenticatorSelection": {
+        "requireResidentKey": true,
+        "residentKey": "required",
+        "userVerification": "preferred"
+      },
+      "timeout": 60000,
+      "extensions": {
+        "credProps": true
+      },
+      "attestation": "none"
+    }
+  },
+  {
+    "rp": {
+      "name": "webauthn.io",
+      "id": "webauthn.io"
+    },
+    "user": {
+      "id": "8nIJX1oCPcj5Pjbch9AecDwQukprh-xsiW4kAwouSQc",
+      "name": "fgg",
+      "displayName": "fgg"
+    },
+    "timeout": 60000,
+    "excludeCredentials": [],
+    "authenticatorSelection": {
+      "residentKey": "required",
+      "requireResidentKey": true,
+      "userVerification": "required"
+    },
+    "attestation": "none",
+    "hints": [],
+    "extensions": {
+      "credProps": true
+    }
+  }
+]

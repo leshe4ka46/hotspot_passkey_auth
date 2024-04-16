@@ -37,18 +37,11 @@ func main() {
 	if err!=nil{
 		panic(err)
 	}
-	var attachment protocol.AuthenticatorAttachment
-	if os.Getenv("WEBAUTHN_RPID")=="platform"{
-		attachment="platform"
-	} else {
-		attachment="cross-platform"
-	}
 	config:=wa.Config{
 		DisplayName:os.Getenv("WEBAUTHN_DISPLAY_NAME"),
 		RPID:os.Getenv("WEBAUTHN_RPID"),
 		ExternalURL: *url,
 		ConveyancePreference: wa.ParceAttestationPreference(os.Getenv("WEBAUTHN_CONVEYANCE_PREFERENCE")),
-		AuthenticatorAttachment: attachment,
 	}
 	webauthn, err := wa.InitWebauthn(config)
 	if err!=nil{

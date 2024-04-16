@@ -2,6 +2,8 @@ package consts
 
 const MacUserLifetime = 1 //min
 
+const DistPath = "/home/alex/go-webauthn-example/front/build/"
+
 const CookieLifeTime = 3600
 const LoginCookieName = "loginCookie"
 const CookieDomain = "localhost"
