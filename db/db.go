@@ -6,7 +6,7 @@ import (
 	"hotspot_passkey_auth/consts"
 	"strings"
 	"time"
-
+	"errors"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -103,6 +103,9 @@ func GetUserByCookie(db *gorm.DB, cookie string) (gocheck Gocheck, err error) {
 }
 
 func AddUserMac(db *gorm.DB, mac string) (err error) {
+	if mac == "" {
+		return errors.New("no mac passed")
+	}
 	return db.Create(&Radcheck{Username: mac, Attribute: "Cleartext-Password", Op: ":=", Value: "8ud8HevunaNXmcTEcjkBWAzX0iuhc6JF", CreatedTime: time.Now().Unix()}).Error
 }
 
@@ -115,9 +118,8 @@ func GetUserByUsername(db *gorm.DB, uname string) (gocheck Gocheck, err error) {
 	return
 }
 
-
-func ExpireMacUsers(db *gorm.DB)(err error){
-	err=db.Where("created_time < ?", time.Now().Unix()-consts.MacUserLifetime).Delete(&Radcheck{}).Error
+func ExpireMacUsers(db *gorm.DB) (err error) {
+	err = db.Where("created_time < ?", time.Now().Unix()-consts.MacUserLifetime).Delete(&Radcheck{}).Error
 	/*var users []Radcheck
 	var res []Radcheck
 	err = db.Find(&users).Error
