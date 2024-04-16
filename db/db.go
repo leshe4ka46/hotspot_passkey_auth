@@ -117,7 +117,7 @@ func GetUserByUsername(db *gorm.DB, uname string) (gocheck Gocheck, err error) {
 
 
 func ExpireMacUsers(db *gorm.DB)(err error){
-	err=db.Where("created_time < ?", time.Now().Unix()-consts.MacUserLifetime*60).Delete(&Radcheck{}).Error
+	err=db.Where("created_time < ?", time.Now().Unix()-consts.MacUserLifetime).Delete(&Radcheck{}).Error
 	/*var users []Radcheck
 	var res []Radcheck
 	err = db.Find(&users).Error

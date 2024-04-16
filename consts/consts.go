@@ -5,9 +5,7 @@ import (
 	"strconv"
 )
 
-const MacUserLifetime = 1 //min
-
-const DistPath = "/home/alex/go-webauthn-example/front/build/"
+const DistPath = "./dist"
 
 func toInt(s string) (i int) {
 	i, _ = strconv.Atoi(s)
@@ -15,6 +13,8 @@ func toInt(s string) (i int) {
 }
 
 var CookieLifeTime = toInt(os.Getenv("COOKIE_LIFETIME"))
+
+var MacUserLifetime = toInt(os.Getenv("RADCHECK_LIFETIME"))
 
 const LoginCookieName = "loginCookie"
 
