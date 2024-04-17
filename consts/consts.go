@@ -31,3 +31,5 @@ const LoginWithoutKeysPath = apiPath + "/radius/login"
 const AttestationPath = apiPath + "/webauthn/attestation"
 
 const AssertionPath = apiPath + "/webauthn/assertion"
+
+const AdminPath = apiPath + "/admin"

@@ -2,14 +2,31 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hotspot_passkey_auth/consts"
 	"strings"
 	"time"
-	"errors"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
+
+type DB struct {
+	db *gorm.DB
+}
+
+type Database interface {
+	GocheckAuth(username string, password string) (gocheck Gocheck, err error)
+	AddUser(user *Gocheck) (err error)
+	GetUserByCookie(cookie string) (gocheck Gocheck, err error)
+	UpdateUser(gocheck Gocheck) (err error)
+	GetUserByUsername(uname string) (gocheck Gocheck, err error)
+	AddMacRadcheck(mac string) (err error)
+	DelByCookie(cookie string) (err error)
+	GetRadcheck() (res []Radacct,err error)
+	ExpireMacUsers() (err error)
+}
 
 type Radcheck struct {
 	Id          uint   `gorm:"primaryKey"`
@@ -34,22 +51,69 @@ type Gocheck struct {
 	Cookies           string `gorm:"type:string"`
 	Webauthn          string `gorm:"type:string"`
 	WebauthnUser      string `gorm:"type:string"`
+	IsAdmin           bool   `gorm:"type:boolean"`
 }
 
 func (Gocheck) TableName() string {
 	return "gocheck"
 }
 
-func Connedt(user, password, host, port, dbname string) (db *gorm.DB, err error) {
+type Radacct struct {
+	Radacctid          uint   `gorm:"primaryKey"`
+	Acctsessionid      string `gorm:"type:varchar(64)"`
+	Acctuniqueid       string `gorm:"type:varchar(32)"`
+	Username           string `gorm:"type:varchar(64)"`
+	Realm              string `gorm:"type:varchar(64)"`
+	Nasipaddress       string `gorm:"type:varchar(15)"`
+	Nasportid          string `gorm:"type:varchar(15)"`
+	Nasporttype        string `gorm:"type:varchar(32)"`
+	Acctstarttime      time.Time
+	Acctupdatetime     time.Time
+	Acctstoptime       time.Time
+	Acctinterval       int
+	Acctsessiontime    int
+	Acctauthentic      string `gorm:"type:varchar(32)"`
+	ConnectinfoStart   string `gorm:"type:varchar(50)"`
+	ConnectinfoStop    string `gorm:"type:varchar(50)"`
+	Acctinputoctets    uint
+	Acctoutputoctets   uint
+	Calledstationid    string `gorm:"type:varchar(50)"`
+	Callingstationid   string `gorm:"type:varchar(50)"`
+	Acctterminatecause string `gorm:"type:varchar(32)"`
+	Servicetype        string `gorm:"type:varchar(32)"`
+	Framedprotocol     string `gorm:"type:varchar(32)"`
+	Framedipaddress    string `gorm:"type:varchar(15)"`
+	Framedipv6address  string `gorm:"type:varchar(45)"`
+	Framedipv6prefix   string `gorm:"type:varchar(45)"`
+	Framedinterfaceid  string `gorm:"type:varchar(32)"`
+	Deligateipv6prefix string `gorm:"type:varchar(45)"`
+	Class              string `gorm:"type:varchar(32)"`
+}
+
+func (Radacct) TableName() string {
+	return "radacct"
+}
+
+func Connect(user, password, host, port, dbname string) *DB {
+	db, err := Oldconnect(user, password, host, port, dbname)
+	if err != nil {
+		return nil
+	}
+	return &DB{
+		db: db,
+	}
+}
+
+func Oldconnect(user, password, host, port, dbname string) (db *gorm.DB, err error) {
 	dbAddress := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", user, password, host, port, dbname)
 	db, err = gorm.Open(postgres.Open(dbAddress))
 	return
 }
 
-func GocheckGetUsernameAndPass(db *gorm.DB, username string, password string) (gocheck Gocheck, err error) {
+func (p *DB) GocheckAuth(username string, password string) (gocheck Gocheck, err error) {
 	fields := []string{"username = ?", "password = ?"}
 	values := []interface{}{username, password}
-	err = db.Where(strings.Join(fields, " AND "), values...).First(&gocheck).Error
+	err = p.db.Where(strings.Join(fields, " AND "), values...).First(&gocheck).Error
 	return
 }
 
@@ -79,63 +143,42 @@ func addToArray(str string, value string) (err error, result string) {
 	return
 }
 
-func AddUserCookieAndMac(db *gorm.DB, gocheck Gocheck, cookie, mac string) (err error) {
-	err, gocheck.Cookies = addToArray(gocheck.Cookies, cookie)
-	if err != nil {
-		return
-	}
-	err, gocheck.Mac = addToArray(gocheck.Mac, mac)
-	if err != nil {
-		return
-	}
-	err = db.Model(gocheck).Where("username = ?", gocheck.Username).Update("cookies", string(gocheck.Cookies)).Update("mac", string(gocheck.Mac)).Error
+func (p *DB) UpdateUser(gocheck Gocheck) (err error) {
+	err = p.db.Model(gocheck).Where("username = ?", gocheck.Username).Update("cookies", string(gocheck.Cookies)).Update("mac", string(gocheck.Mac)).Update("credentials", string(gocheck.Credentials)).Update("webauthn", string(gocheck.Webauthn)).Update("webauthn_user", string(gocheck.WebauthnUser)).Update("credentials_sign_in", string(gocheck.CredentialsSignIn)).Error
 	return
 }
 
-func UpdateUser(db *gorm.DB, gocheck Gocheck) (err error) {
-	err = db.Model(gocheck).Where("username = ?", gocheck.Username).Update("cookies", string(gocheck.Cookies)).Update("mac", string(gocheck.Mac)).Update("credentials", string(gocheck.Credentials)).Update("webauthn", string(gocheck.Webauthn)).Update("webauthn_user", string(gocheck.WebauthnUser)).Update("credentials_sign_in", string(gocheck.CredentialsSignIn)).Error
+func (p *DB) GetUserByCookie(cookie string) (gocheck Gocheck, err error) {
+	err = p.db.Where("cookies = ?", cookie).First(&gocheck).Error
 	return
 }
 
-func GetUserByCookie(db *gorm.DB, cookie string) (gocheck Gocheck, err error) {
-	err = db.Where("cookies = ?", cookie).First(&gocheck).Error
-	return
-}
-
-func AddUserMac(db *gorm.DB, mac string) (err error) {
+func (p *DB) AddMacRadcheck(mac string) (err error) {
 	if mac == "" {
 		return errors.New("no mac passed")
 	}
-	return db.Create(&Radcheck{Username: mac, Attribute: "Cleartext-Password", Op: ":=", Value: "8ud8HevunaNXmcTEcjkBWAzX0iuhc6JF", CreatedTime: time.Now().Unix()}).Error
+	return p.db.Create(&Radcheck{Username: mac, Attribute: "Cleartext-Password", Op: ":=", Value: "8ud8HevunaNXmcTEcjkBWAzX0iuhc6JF", CreatedTime: time.Now().Unix()}).Error
 }
 
-func AddUser(db *gorm.DB, user *Gocheck) (err error) {
-	return db.Create(user).Error
+func (p *DB) AddUser(user *Gocheck) (err error) {
+	return p.db.Create(user).Error
 }
 
-func GetUserByUsername(db *gorm.DB, uname string) (gocheck Gocheck, err error) {
-	err = db.Where("username = ?", uname).First(&gocheck).Error
+func (p *DB) GetUserByUsername(uname string) (gocheck Gocheck, err error) {
+	err = p.db.Where("username = ?", uname).First(&gocheck).Error
 	return
 }
 
-func ExpireMacUsers(db *gorm.DB) (err error) {
-	err = db.Where("created_time < ?", time.Now().Unix()-consts.MacUserLifetime).Delete(&Radcheck{}).Error
-	/*var users []Radcheck
-	var res []Radcheck
-	err = db.Find(&users).Error
-	if err!=nil{
-		return
-	}
-	fmt.Printf("in %+v\n",users)
-	currTime:=time.Now().Unix()
-	fmt.Printf("%+v\n",currTime)
-	for _,user:=range(users){
-		if(user.CreatedTime+consts.MacUserLifetime*60>=currTime){
-			res = append(res, user)
-		}
-	}
-	db.Save(res)
-	err=db.Commit().Error
-	fmt.Printf("out %+v\n",res)*/
+func (p *DB) DelByCookie(cookie string) (err error) {
+	return p.db.Delete(&Gocheck{}, "password = '' AND Cookies=?", cookie).Error
+}
+
+func (p *DB) GetRadcheck() (res []Radacct,err error) {
+	err = p.db.Find(&res).Error
+	return
+}
+
+func (p *DB) ExpireMacUsers() (err error) {
+	err = p.db.Where("created_time < ?", time.Now().Unix()-consts.MacUserLifetime).Delete(&Radcheck{}).Error
 	return
 }

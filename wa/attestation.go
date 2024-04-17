@@ -7,21 +7,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"gorm.io/gorm"
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/db"
 	"hotspot_passkey_auth/store"
 	"io/ioutil"
 )
 
-func AttestationGet(database *gorm.DB, wba *webauthn.WebAuthn, config *Config, userProvider *store.SessionProvider) gin.HandlerFunc {
+func AttestationGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		cookie, err := c.Cookie(consts.LoginCookieName)
 		if err != nil {
 			c.JSON(404, gin.H{"error": "Not found"})
 			return
 		}
-		db_user, err := db.GetUserByCookie(database, cookie)
+		db_user, err := database.GetUserByCookie(cookie)
 		if err != nil {
 			c.JSON(404, gin.H{"error": "Not found"})
 			return
@@ -49,20 +48,20 @@ func AttestationGet(database *gorm.DB, wba *webauthn.WebAuthn, config *Config, u
 		opts.Response.Extensions=protocol.AuthenticationExtensions{"credProps":true}
 		db_user.Webauthn = JSONString(data)
 		db_user.WebauthnUser = JSONString(user)
-		db.UpdateUser(database, db_user)
+		database.UpdateUser(db_user)
 		c.JSON(200, gin.H{"status": "OK", "data": opts})
 	}
 	return gin.HandlerFunc(fn)
 }
 
-func AttestationPost(database *gorm.DB, wba *webauthn.WebAuthn, config *Config, userProvider *store.SessionProvider) gin.HandlerFunc {
+func AttestationPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		cookie, err := c.Cookie(consts.LoginCookieName)
 		if err != nil {
 			c.JSON(404, gin.H{"error": "Cookie not found"})
 			return
 		}
-		db_user, err := db.GetUserByCookie(database, cookie)
+		db_user, err := database.GetUserByCookie(cookie)
 		if err != nil {
 			c.JSON(404, gin.H{"error": "User not found"})
 			return
@@ -97,8 +96,8 @@ func AttestationPost(database *gorm.DB, wba *webauthn.WebAuthn, config *Config, 
 		creds = append(creds, *cred)
 		db_user.Credentials = JSONString(creds)
 		db_user.Webauthn = ""
-		db.UpdateUser(database, db_user)
-		db.AddUserMac(database, db_user.Mac)
+		database.UpdateUser(db_user)
+		database.AddMacRadcheck(db_user.Mac)
 		c.JSON(200, gin.H{"status": "OK", "data": "ok"})
 	}
 	return gin.HandlerFunc(fn)

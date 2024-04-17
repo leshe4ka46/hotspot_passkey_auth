@@ -7,7 +7,6 @@ import (
 	"hotspot_passkey_auth/db"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 func getMacFromCookie(cookie string) (mac string, err error) {
@@ -24,19 +23,19 @@ func getMacFromCookie(cookie string) (mac string, err error) {
 	return
 }
 
-func NoKeysHandler(database *gorm.DB) gin.HandlerFunc {
+func NoKeysHandler(database *db.DB) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		cookie, err := c.Cookie(consts.LoginCookieName)
 		if err != nil {
 			c.JSON(404, gin.H{"error": "Cookie get err"})
 			return
 		}
-		db_user, err := db.GetUserByCookie(database, cookie)
+		db_user, err := database.GetUserByCookie(cookie)
 		if err != nil {
 			c.JSON(404, gin.H{"error": "DB err"})
 			return
 		}
-		db.AddUserMac(database, db_user.Mac)
+		database.AddMacRadcheck(db_user.Mac)
 		c.JSON(200, gin.H{"status": "OK"})
 	}
 	return gin.HandlerFunc(fn)

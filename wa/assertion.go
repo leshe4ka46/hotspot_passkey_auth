@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"gorm.io/gorm"
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/db"
 	"hotspot_passkey_auth/store"
@@ -15,7 +14,7 @@ import (
 	"errors"
 )
 
-func AssertionGet(database *gorm.DB, wba *webauthn.WebAuthn, config *Config, userProvider *store.SessionProvider) gin.HandlerFunc {
+func AssertionGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		var opts = []webauthn.LoginOption{
 			webauthn.WithUserVerification(protocol.VerificationPreferred),
@@ -25,7 +24,7 @@ func AssertionGet(database *gorm.DB, wba *webauthn.WebAuthn, config *Config, use
 			c.JSON(404, gin.H{"error": "Cookie not found"})
 			return
 		}
-		db_user, err := db.GetUserByCookie(database, cookie)
+		db_user, err := database.GetUserByCookie(cookie)
 		if err != nil {
 			c.JSON(404, gin.H{"error": "User not found"})
 			return
@@ -40,7 +39,7 @@ func AssertionGet(database *gorm.DB, wba *webauthn.WebAuthn, config *Config, use
 		}
 		fmt.Printf("data: %+v\n", data)
 		db_user.Webauthn = JSONString(data)
-		db.UpdateUser(database, db_user)
+		database.UpdateUser(db_user)
 		c.JSON(200, gin.H{"status": "OK", "data": assertion})
 	}
 	return gin.HandlerFunc(fn)
@@ -50,7 +49,7 @@ type MacFromAssertion struct{
 	Mac string `json:"mac"`
 }
 
-func AssertionPost(database *gorm.DB, wba *webauthn.WebAuthn, config *Config, userProvider *store.SessionProvider) gin.HandlerFunc {
+func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		var (
 			credential     *webauthn.Credential
@@ -71,7 +70,7 @@ func AssertionPost(database *gorm.DB, wba *webauthn.WebAuthn, config *Config, us
 			c.JSON(404, gin.H{"error": "Cookie not found"})
 			return
 		}
-		db_user, err := db.GetUserByCookie(database, cookie)
+		db_user, err := database.GetUserByCookie(cookie)
 		if err != nil {
 			c.JSON(404, gin.H{"error": "User not found"})
 			return
@@ -85,7 +84,7 @@ func AssertionPost(database *gorm.DB, wba *webauthn.WebAuthn, config *Config, us
 		json.Unmarshal([]byte(db_user.CredentialsSignIn), &credssignin)
 		if credential, err = wba.ValidateDiscoverableLogin(func(_, userHandle []byte) (_ webauthn.User, err error) {
 			fmt.Println("userHandle:", userHandle)
-			db_user, err = db.GetUserByUsername(database, string(userHandle))
+			db_user, err = database.GetUserByUsername(string(userHandle))
 			if err != nil {
 				return &store.User{}, errors.New("user not found")
 			}
@@ -105,10 +104,10 @@ func AssertionPost(database *gorm.DB, wba *webauthn.WebAuthn, config *Config, us
 		credssignin=append(credssignin, *credential)
 		db_user.CredentialsSignIn=JSONString(credssignin)
 		db_user.Mac=macData.Mac
-		db.UpdateUser(database, db_user)
-		database.Delete(&db.Gocheck{}, "password = '' AND Cookies=?", cookie)
+		database.UpdateUser(db_user)
+		database.DelByCookie(cookie)
 		c.SetCookie(consts.LoginCookieName, db_user.Cookies, consts.CookieLifeTime, "/", consts.CookieDomain, false, true)
-		db.AddUserMac(database, db_user.Mac)
+		database.AddMacRadcheck(db_user.Mac)
 		c.JSON(200, gin.H{"status": "OK"})
 	}
 	return gin.HandlerFunc(fn)

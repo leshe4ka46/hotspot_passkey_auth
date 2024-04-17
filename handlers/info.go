@@ -4,10 +4,8 @@ import (
 	"encoding/base64"
 	"github.com/gin-gonic/gin"
 	"github.com/twinj/uuid"
-	"gorm.io/gorm"
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/db"
-	"hotspot_passkey_auth/store"
 	"math/rand"
 	"time"
 )
@@ -23,13 +21,13 @@ func RandStringRunes(n int) string {
 	return string(b)
 }
 
-func makeNewUser(database *gorm.DB,c *gin.Context) {
+func makeNewUser(database *db.DB,c *gin.Context) {
 	uid := base64.RawStdEncoding.EncodeToString(uuid.NewV4().Bytes())
 	c.SetCookie(consts.LoginCookieName, uid, consts.CookieLifeTime, "/", consts.CookieDomain, consts.SecureCookie, true)
-	db.AddUser(database, &db.Gocheck{Cookies: uid, Username: RandStringRunes(64)})
+	database.AddUser(&db.Gocheck{Cookies: uid, Username: RandStringRunes(64)})
 }
 
-func InfoHandler(database *gorm.DB, userProvider *store.SessionProvider) gin.HandlerFunc {
+func InfoHandler(database *db.DB) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		cookie, err := c.Cookie(consts.LoginCookieName)
 		if err != nil || cookie == "" {
@@ -37,7 +35,7 @@ func InfoHandler(database *gorm.DB, userProvider *store.SessionProvider) gin.Han
 			c.JSON(404, gin.H{"error": "User not found"})
 			return
 		}
-		user, err := db.GetUserByCookie(database, cookie)
+		user, err := database.GetUserByCookie(cookie)
 		if err != nil || user.Password == "" {
 			makeNewUser(database,c)
 			c.JSON(404, gin.H{"error": "User not found"})
