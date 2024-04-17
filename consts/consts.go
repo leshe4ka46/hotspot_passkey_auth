@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-const DistPath = "./dist"
+const DistPath = "./dist/"
 
 func toInt(s string) (i int) {
 	i, _ = strconv.Atoi(s)

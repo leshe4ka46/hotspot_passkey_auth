@@ -96,6 +96,8 @@ func (Radacct) TableName() string {
 
 func Connect(user, password, host, port, dbname string) *DB {
 	db, err := Oldconnect(user, password, host, port, dbname)
+	db.AutoMigrate(&Gocheck{})
+	db.AutoMigrate(&Radcheck{})
 	if err != nil {
 		return nil
 	}
