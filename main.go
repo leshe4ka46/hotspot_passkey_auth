@@ -4,6 +4,7 @@ import (
 	"hotspot_passkey_auth/db"
 	"hotspot_passkey_auth/server"
 	"hotspot_passkey_auth/wa"
+	"hotspot_passkey_auth/consts"
 	"log"
 	"net/url"
 	"os"
@@ -15,7 +16,7 @@ import (
 func ExpireUsers(database *db.DB){
 	for {
 		database.ExpireMacUsers()
-		time.Sleep(60*time.Second)
+		time.Sleep(time.Duration(consts.MacExpirePollTime)*time.Second)
 	}
 }
 

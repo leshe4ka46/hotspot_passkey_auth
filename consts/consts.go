@@ -12,6 +12,8 @@ func toInt(s string) (i int) {
 	return
 }
 
+var MacExpirePollTime = toInt(os.Getenv("MAC_EXPIRE_POLL_TIME"))
+
 var CookieLifeTime = toInt(os.Getenv("COOKIE_LIFETIME"))
 
 var MacUserLifetime = int64(toInt(os.Getenv("RADCHECK_LIFETIME")))
