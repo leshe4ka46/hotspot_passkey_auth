@@ -151,7 +151,7 @@ func (p *DB) UpdateUser(gocheck Gocheck) (err error) {
 }
 
 func (p *DB) GetUserByCookie(cookie string) (gocheck Gocheck, err error) {
-	err = p.db.Where("cookies = ?", cookie).First(&gocheck).Error
+	err = p.db.Where("strpos(cookies,?) > 0", cookie).First(&gocheck).Error
 	return
 }
 
@@ -182,5 +182,32 @@ func (p *DB) GetRadcheck() (res []Radacct,err error) {
 
 func (p *DB) ExpireMacUsers() (err error) {
 	err = p.db.Where("created_time < ?", time.Now().Unix()-consts.MacUserLifetime).Delete(&Radcheck{}).Error
+	return
+}
+
+func AddStr(in string, mac string) (out string) {
+	var arr []string = []string{}
+	if in != "" {
+		json.Unmarshal([]byte(in), &arr)
+	}
+	arr = append(arr, mac)
+	outb, _ := json.Marshal(arr)
+	out=string(outb)
+	return
+}
+
+func RemoveStr(in string, mac string) (out string) {
+	var arr []string = []string{}
+	var outarr []string
+	if in != "" {
+		json.Unmarshal([]byte(in), &arr)
+	}
+	for _,el := range(arr){
+		if(el!=mac){
+			outarr=append(outarr, el)
+		}
+	}
+	outb, _ := json.Marshal(outarr)
+	out=string(outb)
 	return
 }

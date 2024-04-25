@@ -38,7 +38,7 @@ func InitServer(database *db.DB, wba *webauthn.WebAuthn, cfg *wa.Config) *gin.En
 
 	router.GET(consts.InfoPath, handlers.InfoHandler(database))
 	router.POST(consts.LoginPath, handlers.LoginHandler(database))
-	router.GET(consts.LogoutPath, handlers.LogoutHandler)
+	router.GET(consts.LogoutPath, handlers.LogoutHandler(database))
 	router.POST(consts.LoginWithoutKeysPath, handlers.NoKeysHandler(database))
 
 	router.GET(consts.AttestationPath, wa.AttestationGet(database, wba, cfg))

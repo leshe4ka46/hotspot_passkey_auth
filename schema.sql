@@ -68,24 +68,24 @@ CREATE INDEX radacct_start_user_idx ON radacct (AcctStartTime, UserName);
 --
 -- Table structure for table 'radcheck'
 --
-CREATE TABLE radcheck (
-	id			serial PRIMARY KEY,
-	UserName		text NOT NULL DEFAULT '',
-	Attribute		text NOT NULL DEFAULT '',
-	op			VARCHAR(2) NOT NULL DEFAULT '==',
-	Value			text NOT NULL DEFAULT ''
-);
-create index radcheck_UserName on radcheck (UserName,Attribute);
+-- CREATE TABLE radcheck (
+-- 	id			serial PRIMARY KEY,
+-- 	UserName		text NOT NULL DEFAULT '',
+-- 	Attribute		text NOT NULL DEFAULT '',
+-- 	op			VARCHAR(2) NOT NULL DEFAULT '==',
+-- 	Value			text NOT NULL DEFAULT ''
+-- );
+-- create index radcheck_UserName on radcheck (UserName,Attribute);
 
-CREATE TABLE gocheck (
-	id			serial PRIMARY KEY,
-	UserName		text NOT NULL DEFAULT '',
-	Password			text NOT NULL DEFAULT '',
-	Mac 			text NOT NULL DEFAULT '',
-	Credentials			text NOT NULL DEFAULT '[]',
-	Cookies			text NOT NULL DEFAULT '[]'
-	
-);
+-- CREATE TABLE gocheck (
+-- 	id			serial PRIMARY KEY,
+-- 	UserName		text NOT NULL DEFAULT '',
+-- 	Password			text NOT NULL DEFAULT '',
+-- 	Mac 			text NOT NULL DEFAULT '',
+-- 	Credentials			text NOT NULL DEFAULT '[]',
+-- 	Cookies			text NOT NULL DEFAULT '[]'
+
+-- );
 
 --
 -- Use this index if you use case insensitive queries
