@@ -45,7 +45,7 @@ type Gocheck struct {
 	Id                uint   `gorm:"primaryKey"`
 	Username          string `gorm:"type:varchar(64);uniqueIndex"`
 	Password          string `gorm:"type:varchar(64)"`
-	Mac               string `gorm:"type:varchar(17)"`
+	Mac               string `gorm:"type:string"`
 	Credentials       string `gorm:"type:string"`
 	CredentialsSignIn string `gorm:"type:string"`
 	Cookies           string `gorm:"type:string"`
@@ -210,4 +210,13 @@ func RemoveStr(in string, mac string) (out string) {
 	outb, _ := json.Marshal(outarr)
 	out=string(outb)
 	return
+}
+
+func GetFirst(in string) (out string){
+	var arr []string = []string{}
+	if in == "" {
+		return "";
+	}
+	json.Unmarshal([]byte(in), &arr)
+	return arr[0];
 }

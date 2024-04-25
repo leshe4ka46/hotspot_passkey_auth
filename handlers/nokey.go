@@ -35,7 +35,7 @@ func NoKeysHandler(database *db.DB) gin.HandlerFunc {
 			c.JSON(404, gin.H{"error": "DB err"})
 			return
 		}
-		database.AddMacRadcheck(db_user.Mac)
+		database.AddMacRadcheck(db.GetFirst(db_user.Mac))
 		c.JSON(200, gin.H{"status": "OK"})
 	}
 	return gin.HandlerFunc(fn)

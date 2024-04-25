@@ -49,14 +49,7 @@ type MacFromAssertion struct{
 	Mac string `json:"mac"`
 }
 
-func getFirstCookie(in string) (out string){
-	var arr []string = []string{}
-	if in == "" {
-		return "";
-	}
-	json.Unmarshal([]byte(in), &arr)
-	return arr[0];
-}
+
 
 func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
@@ -115,7 +108,7 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 		db_user.Mac=db.AddStr(db_user.Mac,macData.Mac)
 		database.UpdateUser(db_user)
 		database.DelByCookie(cookie)
-		c.SetCookie(consts.LoginCookieName, getFirstCookie(db_user.Cookies), consts.CookieLifeTime, "/", consts.CookieDomain, false, true)
+		c.SetCookie(consts.LoginCookieName, db.GetFirst(db_user.Cookies), consts.CookieLifeTime, "/", consts.CookieDomain, false, true)
 		database.AddMacRadcheck(db_user.Mac)
 		c.JSON(200, gin.H{"status": "OK"})
 	}
