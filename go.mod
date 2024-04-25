@@ -4,9 +4,9 @@ go 1.21
 
 require (
 	github.com/gin-gonic/gin v1.9.1
-	github.com/go-webauthn/webauthn v0.2.1
+	github.com/go-webauthn/webauthn v0.10.2
 	github.com/joho/godotenv v1.5.1
-	github.com/rs/cors v1.10.1
+	github.com/rs/cors v1.11.0
 	github.com/tstranex/u2f v1.0.0
 	github.com/twinj/uuid v1.0.0
 	gorm.io/driver/postgres v1.5.7
@@ -16,7 +16,6 @@ require (
 require (
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
-	github.com/cloudflare/cfssl v1.5.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.6.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
@@ -25,9 +24,7 @@ require (
 	github.com/go-playground/validator/v10 v10.14.0 // indirect
 	github.com/go-webauthn/x v0.1.9 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.3.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
-	github.com/google/certificate-transparency-go v1.0.21 // indirect
 	github.com/google/go-tpm v0.9.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
