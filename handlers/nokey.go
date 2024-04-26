@@ -1,26 +1,22 @@
 package handlers
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/db"
-
+	"encoding/json"
 	"github.com/gin-gonic/gin"
 )
 
-func getMacFromCookie(cookie string) (mac string, err error) {
-	str, err := base64.RawStdEncoding.DecodeString(cookie)
-	if err != nil {
-		return
+func GetMacByCookie(m string, c string, cookie string) (mac string) {
+	var macs, cookies []string
+	json.Unmarshal([]byte(m), &macs)
+	json.Unmarshal([]byte(c), &cookies)
+	for i, c := range cookies {
+		if string(c) == cookie {
+			return macs[i]
+		}
 	}
-	var base64Cookie Base64Cookie
-	err = json.Unmarshal(str, &base64Cookie)
-	if err != nil {
-		return
-	}
-	mac = base64Cookie.Mac
-	return
+	return ""
 }
 
 func NoKeysHandler(database *db.DB) gin.HandlerFunc {
@@ -35,7 +31,7 @@ func NoKeysHandler(database *db.DB) gin.HandlerFunc {
 			c.JSON(404, gin.H{"error": "DB err"})
 			return
 		}
-		database.AddMacRadcheck(db.GetFirst(db_user.Mac))
+		database.AddMacRadcheck(GetMacByCookie(db_user.Mac,db_user.Cookies,cookie))
 		c.JSON(200, gin.H{"status": "OK"})
 	}
 	return gin.HandlerFunc(fn)
