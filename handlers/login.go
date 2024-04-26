@@ -37,6 +37,7 @@ func LoginHandler(database *db.DB) gin.HandlerFunc {
 		}
 		user.Cookies = db.AddStr(user.Cookies,cookie)
 		user.Mac = db.AddStr(user.Mac,login.Mac)
+		user.Cookies = db.AddStr(user.Cookies,cookie)
 		database.UpdateUser(user)
 		database.DelByCookie(cookie)
 		c.JSON(200, gin.H{"status": login.Username})

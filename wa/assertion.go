@@ -3,6 +3,7 @@ package wa
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-webauthn/webauthn/protocol"
@@ -11,7 +12,6 @@ import (
 	"hotspot_passkey_auth/db"
 	"hotspot_passkey_auth/store"
 	"io/ioutil"
-	"errors"
 )
 
 func AssertionGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.HandlerFunc {
@@ -45,11 +45,9 @@ func AssertionGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.H
 	return gin.HandlerFunc(fn)
 }
 
-type MacFromAssertion struct{
+type MacFromAssertion struct {
 	Mac string `json:"mac"`
 }
-
-
 
 func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
@@ -90,26 +88,27 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 			if err != nil {
 				return &store.User{}, errors.New("user not found")
 			}
-			asserting_user:=&store.User{
-				ID: string(db_user.Username),
-				Name: string(userHandle),
+			asserting_user := &store.User{
+				ID:          string(db_user.Username),
+				Name:        string(userHandle),
 				DisplayName: string(userHandle),
 			}
-			json.Unmarshal([]byte(db_user.Credentials),&asserting_user.Credentials)
+			json.Unmarshal([]byte(db_user.Credentials), &asserting_user.Credentials)
 			return asserting_user, nil
 		}, webauthnData, parsedResponse); err != nil {
 			c.JSON(404, gin.H{"error": "User not found"})
 			return
 		}
 		var macData MacFromAssertion
-		json.Unmarshal(postData,&macData)
-		credssignin=append(credssignin, *credential)
-		db_user.CredentialsSignIn=JSONString(credssignin)
-		db_user.Mac=db.AddStr(db_user.Mac,macData.Mac)
+		json.Unmarshal(postData, &macData)
+		credssignin = append(credssignin, *credential)
+		db_user.CredentialsSignIn = JSONString(credssignin)
+		db_user.Mac = db.AddStr(db_user.Mac, macData.Mac)
+		db_user.Cookies = db.AddStr(db_user.Cookies, cookie)
 		database.UpdateUser(db_user)
 		database.DelByCookie(cookie)
 		c.SetCookie(consts.LoginCookieName, db.GetFirst(db_user.Cookies), consts.CookieLifeTime, "/", consts.CookieDomain, false, true)
-		database.AddMacRadcheck(db_user.Mac)
+		database.AddMacRadcheck(macData.Mac)
 		c.JSON(200, gin.H{"status": "OK"})
 	}
 	return gin.HandlerFunc(fn)
