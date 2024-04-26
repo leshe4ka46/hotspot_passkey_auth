@@ -35,3 +35,10 @@ const AttestationPath = apiPath + "/webauthn/attestation"
 const AssertionPath = apiPath + "/webauthn/assertion"
 
 const AdminPath = apiPath + "/admin"
+
+func UpdConsts() {
+	MacExpirePollTime = toInt(os.Getenv("MAC_EXPIRE_POLL_TIME"))
+	CookieLifeTime = toInt(os.Getenv("COOKIE_LIFETIME"))
+	MacUserLifetime = int64(toInt(os.Getenv("RADCHECK_LIFETIME")))
+	CookieDomain = os.Getenv("COOKIE_DOMAIN")
+}

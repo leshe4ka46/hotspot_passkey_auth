@@ -25,7 +25,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-
+	consts.UpdConsts();
 	database:=db.Connect(os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_NAME"))
 
 	url, err:= url.Parse(os.Getenv("WEBAUTHN_EXTERNAL_URL"))
