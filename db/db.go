@@ -172,7 +172,7 @@ func (p *DB) GetUserByUsername(uname string) (gocheck Gocheck, err error) {
 }
 
 func (p *DB) DelByCookie(cookie string) (err error) {
-	return p.db.Delete(&Gocheck{}, "password = '' AND Cookies=?", cookie).Error
+	return p.db.Delete(&Gocheck{}, "password = '' AND cookies = ?", cookie).Error
 }
 
 func (p *DB) GetRadcheck() (res []Radacct,err error) {
@@ -219,4 +219,16 @@ func GetFirst(in string) (out string){
 	}
 	json.Unmarshal([]byte(in), &arr)
 	return arr[0];
+}
+
+func GetMacByCookie(m string, c string, cookie string) (mac string) {
+	var macs, cookies []string
+	json.Unmarshal([]byte(m), &macs)
+	json.Unmarshal([]byte(c), &cookies)
+	for i, c := range cookies {
+		if string(c) == cookie {
+			return macs[i]
+		}
+	}
+	return ""
 }

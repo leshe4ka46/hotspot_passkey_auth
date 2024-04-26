@@ -97,7 +97,7 @@ func AttestationPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gi
 		db_user.Credentials = JSONString(creds)
 		db_user.Webauthn = ""
 		database.UpdateUser(db_user)
-		database.AddMacRadcheck(db_user.Mac)
+		database.AddMacRadcheck(db.GetMacByCookie(db_user.Mac,db_user.Cookies,cookie))
 		c.JSON(200, gin.H{"status": "OK", "data": "ok"})
 	}
 	return gin.HandlerFunc(fn)
