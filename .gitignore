@@ -1,5 +1,4 @@
 .env
-dist/
 vendor/
 hotspot_passkey_auth
 *.diff
