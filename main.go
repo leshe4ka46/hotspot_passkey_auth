@@ -5,7 +5,7 @@ import (
 	"hotspot_passkey_auth/server"
 	"hotspot_passkey_auth/wa"
 	"hotspot_passkey_auth/consts"
-	"log"
+	"fmt"
 	"net/url"
 	"os"
 	"time"
@@ -23,7 +23,7 @@ func ExpireUsers(database *db.DB){
 func main() {
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		fmt.Printf("Error loading .env file")
 	}
 	consts.UpdConsts();
 	database:=db.Connect(os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_NAME"))

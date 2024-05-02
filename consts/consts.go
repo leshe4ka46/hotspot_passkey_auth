@@ -1,26 +1,27 @@
 package consts
 
 import (
+	"log"
 	"os"
 	"strconv"
 )
 
-const DistPath = "./dist/"
+const DistPath = "/auth-files/"
 
 func toInt(s string) (i int) {
 	i, _ = strconv.Atoi(s)
 	return
 }
 
-var MacExpirePollTime = toInt(os.Getenv("MAC_EXPIRE_POLL_TIME"))
+var MacExpirePollTime = 60*60
 
-var CookieLifeTime = toInt(os.Getenv("COOKIE_LIFETIME"))
+var CookieLifeTime = 60*60
 
-var MacUserLifetime = int64(toInt(os.Getenv("RADCHECK_LIFETIME")))
+var MacUserLifetime int64 = 60*60
 
 const LoginCookieName = "loginCookie"
 
-var CookieDomain = os.Getenv("COOKIE_DOMAIN")
+var CookieDomain = ""
 
 const SecureCookie = false
 
@@ -37,8 +38,22 @@ const AssertionPath = apiPath + "/webauthn/assertion"
 const AdminPath = apiPath + "/admin"
 
 func UpdConsts() {
-	MacExpirePollTime = toInt(os.Getenv("MAC_EXPIRE_POLL_TIME"))
-	CookieLifeTime = toInt(os.Getenv("COOKIE_LIFETIME"))
-	MacUserLifetime = int64(toInt(os.Getenv("RADCHECK_LIFETIME")))
-	CookieDomain = os.Getenv("COOKIE_DOMAIN")
+	tmp:=os.Getenv("MAC_EXPIRE_POLL_TIME")
+	if(tmp!=""){
+		MacExpirePollTime=toInt(tmp)
+	}
+	tmp=os.Getenv("COOKIE_LIFETIME")
+	if(tmp!=""){
+		CookieLifeTime=toInt(tmp)
+	}
+	tmp=os.Getenv("RADCHECK_LIFETIME")
+	if(tmp!=""){
+		MacUserLifetime=int64(toInt(tmp))
+	}
+	tmp=os.Getenv("COOKIE_DOMAIN")
+	if(tmp!=""){
+		CookieDomain=tmp
+	}else{
+		log.Fatal("COOKIE_DOMAIN is not set")
+	}
 }
