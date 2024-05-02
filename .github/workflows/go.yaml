@@ -39,4 +39,4 @@ jobs:
         context: .
         platforms: linux/amd64
         push: true
-        tags: webauthn/server:${{ steps.clean_name.outputs.branch }}
+        tags: git.leshe4ka.ru/webauthn/server:${{ steps.clean_name.outputs.branch }}
