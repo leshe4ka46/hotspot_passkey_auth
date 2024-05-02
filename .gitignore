@@ -3,3 +3,4 @@ dist/
 vendor/
 hotspot_passkey_auth
 *.diff
+**/bindata.go

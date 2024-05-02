@@ -25,16 +25,36 @@ func staticCacheMiddleware() gin.HandlerFunc {
 	}
 }
 
+func bindataStaticHandler(c *gin.Context) {
+	path := c.Param("filepath")
+	data, err := Asset("dist" + path)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "not found", "path": "dist" + path})
+	}
+	c.Writer.Write(data)
+}
+
+func BindataHandler(path string) gin.HandlerFunc {
+	fn := func(c *gin.Context) {
+		data, err := Asset("dist/" + path)
+		if err != nil {
+			c.JSON(404, gin.H{"error": "not found", "path": "dist/" + path})
+		}
+		c.Writer.Write(data)
+	}
+	return gin.HandlerFunc(fn)
+}
+
 func InitServer(database *db.DB, wba *webauthn.WebAuthn, cfg *wa.Config) *gin.Engine {
 	var router = gin.Default()
 	router.Use(staticCacheMiddleware())
-	router.StaticFile("/", consts.DistPath+"index.html")
-	router.StaticFS("/static", http.Dir(consts.DistPath+"static"))
-	router.StaticFile("/favicon.ico", consts.DistPath+"favicon.ico")
-	router.StaticFile("/manifest.json", consts.DistPath+"manifest.json")
-	router.StaticFile("/robots.txt", consts.DistPath+"robots.txt")
-	router.StaticFile("/logo192.png", consts.DistPath+"logo192.png")
-	router.StaticFile("/logo512.png", consts.DistPath+"logo512.png")
+	router.GET("/", BindataHandler("index.html"))
+	router.GET("/static/*filepath", bindataStaticHandler)
+	router.GET("/favicon.ico", BindataHandler("favicon.ico"))
+	router.GET("/manifest.json", BindataHandler("manifest.json"))
+	router.GET("/robots.txt", BindataHandler("robots.txt"))
+	router.GET("/logo192.png", BindataHandler("logo192.png"))
+	router.GET("/logo512.png", BindataHandler("logo512.png"))
 
 	router.GET(consts.InfoPath, handlers.InfoHandler(database))
 	router.POST(consts.LoginPath, handlers.LoginHandler(database))
