@@ -1,7 +1,9 @@
 package server
 
 import (
+	"embed"
 	_ "fmt"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/db"
 	"hotspot_passkey_auth/handlers"
@@ -9,8 +11,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-
-	"github.com/go-webauthn/webauthn/webauthn"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/cors"
@@ -25,18 +25,21 @@ func staticCacheMiddleware() gin.HandlerFunc {
 	}
 }
 
-func bindataStaticHandler(c *gin.Context) {
-	path := c.Param("filepath")
-	data, err := Asset("dist/static" + path)
-	if err != nil {
-		c.JSON(404, gin.H{"error": "not found", "path": "dist/static" + path})
+func bindataStaticHandler(fs embed.FS) gin.HandlerFunc {
+	fn := func(c *gin.Context) {
+		path := c.Param("filepath")
+		data, err := fs.ReadFile("dist/static" + path)
+		if err != nil {
+			c.JSON(404, gin.H{"error": "not found", "path": "dist/static" + path})
+		}
+		c.Writer.Write(data)
 	}
-	c.Writer.Write(data)
+	return gin.HandlerFunc(fn)
 }
 
-func BindataHandler(path string) gin.HandlerFunc {
+func BindataHandler(path string, fs embed.FS) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
-		data, err := Asset("dist/" + path)
+		data, err := fs.ReadFile("dist/" + path)
 		if err != nil {
 			c.JSON(404, gin.H{"error": "not found", "path": "dist/" + path})
 		}
@@ -45,16 +48,16 @@ func BindataHandler(path string) gin.HandlerFunc {
 	return gin.HandlerFunc(fn)
 }
 
-func InitServer(database *db.DB, wba *webauthn.WebAuthn, cfg *wa.Config) *gin.Engine {
+func InitServer(database *db.DB, wba *webauthn.WebAuthn, cfg *wa.Config, fs embed.FS) *gin.Engine {
 	var router = gin.Default()
 	router.Use(staticCacheMiddleware())
-	router.GET("/", BindataHandler("index.html"))
-	router.GET("/static/*filepath", bindataStaticHandler)
-	router.GET("/favicon.ico", BindataHandler("favicon.ico"))
-	router.GET("/manifest.json", BindataHandler("manifest.json"))
-	router.GET("/robots.txt", BindataHandler("robots.txt"))
-	router.GET("/logo192.png", BindataHandler("logo192.png"))
-	router.GET("/logo512.png", BindataHandler("logo512.png"))
+	router.GET("/", BindataHandler("index.html", fs))
+	router.GET("/static/*filepath", bindataStaticHandler(fs))
+	router.GET("/favicon.ico", BindataHandler("favicon.ico", fs))
+	router.GET("/manifest.json", BindataHandler("manifest.json", fs))
+	router.GET("/robots.txt", BindataHandler("robots.txt", fs))
+	router.GET("/logo192.png", BindataHandler("logo192.png", fs))
+	router.GET("/logo512.png", BindataHandler("logo512.png", fs))
 
 	router.GET(consts.InfoPath, handlers.InfoHandler(database))
 	router.POST(consts.LoginPath, handlers.LoginHandler(database))

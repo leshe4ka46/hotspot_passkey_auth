@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"os"
 	"time"
-
+	"embed"
 	"github.com/joho/godotenv"
 )
 
@@ -19,6 +19,9 @@ func ExpireUsers(database *db.DB){
 		time.Sleep(time.Duration(consts.MacExpirePollTime)*time.Second)
 	}
 }
+
+//go:embed dist
+var fs embed.FS
 
 func main() {
 	err := godotenv.Load(".env")
@@ -42,7 +45,7 @@ func main() {
 	if err!=nil{
 		panic(err)
 	}
-	r := server.InitServer(database, webauthn, &config)
+	r := server.InitServer(database, webauthn, &config,fs)
 	go ExpireUsers(database)
 	server.StartServer(r)
 }
