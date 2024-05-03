@@ -27,9 +27,9 @@ func staticCacheMiddleware() gin.HandlerFunc {
 
 func bindataStaticHandler(c *gin.Context) {
 	path := c.Param("filepath")
-	data, err := Asset("dist" + path)
+	data, err := Asset("dist/static" + path)
 	if err != nil {
-		c.JSON(404, gin.H{"error": "not found", "path": "dist" + path})
+		c.JSON(404, gin.H{"error": "not found", "path": "dist/static" + path})
 	}
 	c.Writer.Write(data)
 }
