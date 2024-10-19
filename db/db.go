@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"hotspot_passkey_auth/consts"
 	"strings"
 	"time"
@@ -17,15 +18,17 @@ type DB struct {
 }
 
 type Database interface {
-	GocheckAuth(username string, password string) (gocheck Gocheck, err error)
+	CheckUsernamePassword(username string, password string) (gocheck Gocheck, err error)
 	AddUser(user *Gocheck) (err error)
 	GetUserByCookie(cookie string) (gocheck Gocheck, err error)
 	UpdateUser(gocheck Gocheck) (err error)
 	GetUserByUsername(uname string) (gocheck Gocheck, err error)
 	AddMacRadcheck(mac string) (err error)
-	DelByCookie(cookie string) (err error)
-	GetRadcheck() (res []Radacct,err error)
+	DelUserByCookie(cookie string) (err error)
+	DelCookie(cookie string) (err error)
+	GetRadcheck() (res []Radacct, err error)
 	ExpireMacUsers() (err error)
+	UpdateCred(cred WebauthnData) error
 }
 
 type Radcheck struct {
@@ -42,20 +45,84 @@ func (Radcheck) TableName() string {
 }
 
 type Gocheck struct {
-	Id                uint   `gorm:"primaryKey"`
-	Username          string `gorm:"type:varchar(64);uniqueIndex"`
-	Password          string `gorm:"type:varchar(64)"`
-	Mac               string `gorm:"type:string"`
-	Credentials       string `gorm:"type:string"`
-	CredentialsSignIn string `gorm:"type:string"`
-	Cookies           string `gorm:"type:string"`
-	Webauthn          string `gorm:"type:string"`
-	WebauthnUser      string `gorm:"type:string"`
-	IsAdmin           bool   `gorm:"type:boolean"`
+	Id       uint   `gorm:"primaryKey"`
+	Username string `gorm:"type:varchar(64);uniqueIndex"`
+	Password string `gorm:"typce:varchar(64)"`
+	Mac      string
+	//Credentials  string
+	SessionData string
+	IsAdmin     bool
+
+	Creds   []WebauthnData `gorm:"foreignKey:GocheckUserId"`
+	Cookies []CookieData   `gorm:"foreignKey:GocheckUserId"`
 }
 
 func (Gocheck) TableName() string {
 	return "gocheck"
+}
+
+type WebauthnData struct {
+	Id              uint `gorm:"primaryKey"`
+	Name            string
+	LowerName       string
+	UserID          int64
+	CredentialID    []byte `gorm:"size:1024"`
+	PublicKey       []byte `gorm:"uniqueIndex"`
+	AttestationType string
+	AAGUID          []byte
+	SignCount       uint32
+	CloneWarning    bool
+	BackupEligible  bool
+	CreatedUnix     time.Time // currently unused, was in gitea sources
+	UpdatedUnix     time.Time // currently unused, was in gitea sources
+
+	GocheckUserId uint
+	User          Gocheck `gorm:"foreignKey:GocheckUserId;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+}
+
+func (cred WebauthnData) ToCredentials() webauthn.Credential {
+	return webauthn.Credential{
+		ID:              cred.CredentialID,
+		PublicKey:       cred.PublicKey,
+		AttestationType: cred.AttestationType,
+		Authenticator: webauthn.Authenticator{
+			AAGUID:       cred.AAGUID,
+			SignCount:    cred.SignCount,
+			CloneWarning: cred.CloneWarning,
+		},
+		Flags: webauthn.CredentialFlags{
+			BackupEligible: cred.BackupEligible,
+		},
+	}
+}
+
+func ToWaData(data webauthn.Credential, gocheckuserid uint) WebauthnData {
+	return WebauthnData{
+		CredentialID:    data.ID,
+		PublicKey:       data.PublicKey,
+		AttestationType: data.AttestationType,
+		AAGUID:          data.Authenticator.AAGUID,
+		SignCount:       data.Authenticator.SignCount,
+		CloneWarning:    data.Authenticator.CloneWarning,
+		BackupEligible:  data.Flags.BackupEligible,
+		GocheckUserId:   gocheckuserid,
+	}
+}
+
+func (WebauthnData) TableName() string {
+	return "webauthn-data"
+}
+
+type CookieData struct {
+	Id     uint   `gorm:"primaryKey"`
+	Cookie string `gorm:"type:string"`
+
+	GocheckUserId uint
+	User          Gocheck `gorm:"foreignKey:GocheckUserId;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+}
+
+func (CookieData) CookieData() string {
+	return "cookie-data"
 }
 
 type Radacct struct {
@@ -94,16 +161,23 @@ func (Radacct) TableName() string {
 	return "radacct"
 }
 
-func Connect(user, password, host, port, dbname string) *DB {
+func Connect(user, password, host, port, dbname string) (*DB, error) {
 	db, err := Oldconnect(user, password, host, port, dbname)
-	db.AutoMigrate(&Gocheck{})
-	db.AutoMigrate(&Radcheck{})
 	if err != nil {
-		return nil
+		return nil, err
+	}
+	if err := db.AutoMigrate(&Gocheck{}, &WebauthnData{}, &CookieData{}); err != nil {
+		return nil, err
+	}
+	if err := db.AutoMigrate(&Radcheck{}); err != nil {
+		return nil, err
+	}
+	if err := db.AutoMigrate(&Radacct{}); err != nil {
+		return nil, err
 	}
 	return &DB{
 		db: db,
-	}
+	}, nil
 }
 
 func Oldconnect(user, password, host, port, dbname string) (db *gorm.DB, err error) {
@@ -112,46 +186,35 @@ func Oldconnect(user, password, host, port, dbname string) (db *gorm.DB, err err
 	return
 }
 
-func (p *DB) GocheckAuth(username string, password string) (gocheck Gocheck, err error) {
+func (p *DB) CheckUsernamePassword(username string, password string) (gocheck Gocheck, err error) {
 	fields := []string{"username = ?", "password = ?"}
 	values := []interface{}{username, password}
 	err = p.db.Where(strings.Join(fields, " AND "), values...).First(&gocheck).Error
 	return
 }
 
-func contains(arr []string, name string) bool {
-	for _, value := range arr {
-		if value == name {
-			return true
-		}
-	}
-	return false
+func (p *DB) UpdateCred(cred WebauthnData) error {
+	// return p.db.Save(&cred).Error
+	return p.db.Model(&cred).Where("id = ?", cred.Id).Updates(cred). // save does not recognise id if it is zero
+		// Update("credential_id", cred.CredentialID).
+		// Update("public_key", cred.PublicKey).
+		// Update("attestation_type", cred.AttestationType).
+		// Update("aa_guid", cred.AAGUID).
+		// Update("sign_count", cred.SignCount).
+		// Update("clone_warning", cred.CloneWarning).
+		// Update("backup_eligible", cred.BackupEligible).
+		Error
 }
 
-func addToArray(str string, value string) (err error, result string) {
-	var arr []string
-	json.Unmarshal([]byte(str), &arr)
-	if !contains(arr, value) {
-		arr = append(arr, value)
-		var b []byte
-		b, err = json.Marshal(arr)
-		if err != nil {
-			return
-		}
-		result = string(b)
-		return
-	}
-	result = str
-	return
-}
-
-func (p *DB) UpdateUser(gocheck Gocheck) (err error) {
-	err = p.db.Model(gocheck).Where("username = ?", gocheck.Username).Update("cookies", string(gocheck.Cookies)).Update("mac", string(gocheck.Mac)).Update("credentials", string(gocheck.Credentials)).Update("webauthn", string(gocheck.Webauthn)).Update("webauthn_user", string(gocheck.WebauthnUser)).Update("credentials_sign_in", string(gocheck.CredentialsSignIn)).Error
-	return
+func (p *DB) UpdateUser(gocheck Gocheck) error {
+	err := p.db.Save(&gocheck).Error
+	return err
 }
 
 func (p *DB) GetUserByCookie(cookie string) (gocheck Gocheck, err error) {
-	err = p.db.Where("strpos(cookies,?) > 0", cookie).First(&gocheck).Error
+	var dat CookieData
+	err = p.db.Preload("User").First(&dat, "cookie = ?", cookie).Error
+	gocheck = dat.User
 	return
 }
 
@@ -167,15 +230,26 @@ func (p *DB) AddUser(user *Gocheck) (err error) {
 }
 
 func (p *DB) GetUserByUsername(uname string) (gocheck Gocheck, err error) {
-	err = p.db.Where("username = ?", uname).First(&gocheck).Error
+	err = p.db.Preload("Creds").First(&gocheck, "username = ?", uname).Error
 	return
 }
 
-func (p *DB) DelByCookie(cookie string) (err error) {
-	return p.db.Delete(&Gocheck{}, "password = '' AND cookies = ?", cookie).Error
+func (p *DB) DelUserByCookie(cookie string) error {
+	var dat CookieData
+	if err := p.db.Preload("User").First(&dat, "cookie = ?", cookie).Error; err != nil {
+		return err
+	}
+	if err := p.db.Delete(dat).Error; err != nil {
+		return err
+	}
+	return p.db.Delete(dat.User).Error
 }
 
-func (p *DB) GetRadcheck() (res []Radacct,err error) {
+func (p *DB) DelCookie(cookie string) error {
+	return p.db.Delete(&CookieData{}, "cookie = ?", cookie).Error
+}
+
+func (p *DB) GetRadcheck() (res []Radacct, err error) {
 	err = p.db.Find(&res).Error
 	return
 }
@@ -192,7 +266,7 @@ func AddStr(in string, mac string) (out string) {
 	}
 	arr = append(arr, mac)
 	outb, _ := json.Marshal(arr)
-	out=string(outb)
+	out = string(outb)
 	return
 }
 
@@ -202,23 +276,23 @@ func RemoveStr(in string, mac string) (out string) {
 	if in != "" {
 		json.Unmarshal([]byte(in), &arr)
 	}
-	for _,el := range(arr){
-		if(el!=mac){
-			outarr=append(outarr, el)
+	for _, el := range arr {
+		if el != mac {
+			outarr = append(outarr, el)
 		}
 	}
 	outb, _ := json.Marshal(outarr)
-	out=string(outb)
+	out = string(outb)
 	return
 }
 
-func GetFirst(in string) (out string){
+func GetFirst(in string) (out string) {
 	var arr []string = []string{}
 	if in == "" {
-		return "";
+		return ""
 	}
 	json.Unmarshal([]byte(in), &arr)
-	return arr[0];
+	return arr[0]
 }
 
 func GetMacByCookie(m string, c string, cookie string) (mac string) {

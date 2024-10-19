@@ -1,36 +1,42 @@
 package wa
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/go-webauthn/webauthn/protocol"
-	"github.com/go-webauthn/webauthn/webauthn"
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/db"
-	"hotspot_passkey_auth/store"
+
+	"bytes"
+	"encoding/json"
 	"io/ioutil"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
+
+	"github.com/rs/zerolog/log"
 )
 
 func AttestationGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		cookie, err := c.Cookie(consts.LoginCookieName)
 		if err != nil {
+			log.Info().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "Not found"})
 			return
 		}
 		db_user, err := database.GetUserByCookie(cookie)
 		if err != nil {
+			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "Not found"})
 			return
 		}
-		fmt.Printf("%+v\n", db_user)
-		user := store.User{
+
+		user := User{
 			ID:          db_user.Username,
 			Name:        db_user.Username,
 			DisplayName: db_user.Username,
 		}
+
 		selection := config.AuthenticatorSelection(protocol.ResidentKeyRequirementRequired) // discoverable
 		opts, data, err := wba.BeginRegistration(user,
 			webauthn.WithAuthenticatorSelection(selection),
@@ -39,16 +45,22 @@ func AttestationGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin
 			webauthn.WithAppIdExcludeExtension(config.ExternalURL.String()),
 		)
 		if err != nil {
+			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "Not found"})
 			return
 		}
+
+		// fixups for iphones
 		opts.Response.AuthenticatorSelection.AuthenticatorAttachment = ""
 		opts.Response.AuthenticatorSelection.ResidentKey = "required" // ios fix
-		opts.Response.CredentialExcludeList=[]protocol.CredentialDescriptor{};
-		opts.Response.Extensions=protocol.AuthenticationExtensions{"credProps":true}
-		db_user.Webauthn = JSONString(data)
-		db_user.WebauthnUser = JSONString(user)
-		database.UpdateUser(db_user)
+		opts.Response.CredentialExcludeList = []protocol.CredentialDescriptor{}
+		opts.Response.Extensions = protocol.AuthenticationExtensions{"credProps": true}
+
+		db_user.SessionData = JSONString(data)
+		err = database.UpdateUser(db_user)
+		if err != nil {
+			log.Error().Err(err).Msg("")
+		}
 		c.JSON(200, gin.H{"status": "OK", "data": opts})
 	}
 	return gin.HandlerFunc(fn)
@@ -58,46 +70,52 @@ func AttestationPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gi
 	fn := func(c *gin.Context) {
 		cookie, err := c.Cookie(consts.LoginCookieName)
 		if err != nil {
+			log.Info().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "Cookie not found"})
 			return
 		}
 		db_user, err := database.GetUserByCookie(cookie)
 		if err != nil {
+			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "User not found"})
 			return
 		}
-		fmt.Printf("usr: %+v\n", db_user)
-		var user store.User
-		json.Unmarshal([]byte(db_user.WebauthnUser), &user)
+		user := User{
+			ID:          db_user.Username,
+			Name:        db_user.Username,
+			DisplayName: db_user.Username,
+		}
+
 		var webauthnData webauthn.SessionData
-		json.Unmarshal([]byte(db_user.Webauthn), &webauthnData)
-		var creds []webauthn.Credential
-		json.Unmarshal([]byte(db_user.Credentials), &creds)
+		json.Unmarshal([]byte(db_user.SessionData), &webauthnData)
+
 		jsonData, err := ioutil.ReadAll(c.Request.Body)
 		if err != nil {
+			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "Body not found"})
 			return
 		}
-		fmt.Printf("%+v\n", user)
-		fmt.Printf("%+v\n", webauthnData)
-		fmt.Printf("%+v\n", creds)
-		fmt.Println(string(jsonData))
+
 		parsedResponse, err := protocol.ParseCredentialCreationResponseBody(bytes.NewReader(jsonData))
 		if err != nil {
-			fmt.Println(err)
+			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "Body parce error"})
 			return
 		}
 		cred, err := wba.CreateCredential(user, webauthnData, parsedResponse)
 		if err != nil {
+			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "Could not create credential"})
 			return
 		}
-		creds = append(creds, *cred)
-		db_user.Credentials = JSONString(creds)
-		db_user.Webauthn = ""
-		database.UpdateUser(db_user)
-		database.AddMacRadcheck(db.GetMacByCookie(db_user.Mac,db_user.Cookies,cookie))
+		db_user.Creds = append(db_user.Creds, db.ToWaData(*cred,db_user.Id))
+		db_user.SessionData = ""
+		if err := database.UpdateUser(db_user); err != nil {
+			log.Error().Err(err).Msg("")
+			c.JSON(404, gin.H{"error": "DB err"})
+			return
+		}
+		//database.AddMacRadcheck(db.GetMacByCookie(db_user.Mac,db_user.Cookies,cookie))
 		c.JSON(200, gin.H{"status": "OK", "data": "ok"})
 	}
 	return gin.HandlerFunc(fn)

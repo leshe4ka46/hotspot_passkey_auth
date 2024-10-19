@@ -8,7 +8,6 @@ import (
 	"hotspot_passkey_auth/db"
 	"hotspot_passkey_auth/handlers"
 	"hotspot_passkey_auth/wa"
-	"log"
 	"net/http"
 	"strings"
 
@@ -75,11 +74,11 @@ func InitServer(database *db.DB, wba *webauthn.WebAuthn, cfg *wa.Config, fs embe
 	return router
 }
 
-func StartServer(router *gin.Engine) {
+func StartServer(router *gin.Engine) error {
 	_cors := cors.Options{
 		AllowedMethods: []string{"POST", "GET"},
 		AllowedOrigins: []string{"http://localhost:8080", "http://192.168.88.246/"},
 	}
 	handler := cors.New(_cors).Handler(router)
-	log.Fatal(http.ListenAndServe(":8080", handler))
+	return http.ListenAndServe(":8080", handler)
 }

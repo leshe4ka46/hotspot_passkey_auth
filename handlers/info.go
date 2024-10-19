@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"encoding/base64"
-	"github.com/gin-gonic/gin"
-	"github.com/twinj/uuid"
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/db"
 	"math/rand"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
+	"github.com/twinj/uuid"
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -21,24 +23,35 @@ func RandStringRunes(n int) string {
 	return string(b)
 }
 
-func makeNewUser(database *db.DB,c *gin.Context) {
+func makeNewUser(database *db.DB, c *gin.Context) {
 	uid := base64.RawStdEncoding.EncodeToString(uuid.NewV4().Bytes())
 	c.SetCookie(consts.LoginCookieName, uid, consts.CookieLifeTime, "/", consts.CookieDomain, consts.SecureCookie, true)
-	database.AddUser(&db.Gocheck{Cookies: uid, Username: RandStringRunes(64)})
+	if err := database.AddUser(&db.Gocheck{Cookies: []db.CookieData{{Cookie: uid}}, Username: RandStringRunes(64)}); err != nil {
+		log.Error().Err(err).Msg("")
+		c.JSON(404, gin.H{"error": "DB err"})
+		return
+	}
 }
 
 func InfoHandler(database *db.DB) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		cookie, err := c.Cookie(consts.LoginCookieName)
-		if err != nil || cookie == "" {
-			makeNewUser(database,c)
-			c.JSON(404, gin.H{"error": "User not found"})
+		if err != nil {
+			log.Info().Err(err).Msg("")
+			makeNewUser(database, c)
+			c.JSON(404, gin.H{"error": "Cookie not found"})
 			return
 		}
 		user, err := database.GetUserByCookie(cookie)
-		if err != nil || user.Password == "" {
-			makeNewUser(database,c)
-			c.JSON(404, gin.H{"error": "User not found"})
+		if err != nil {
+			log.Error().Err(err).Msg("")
+			makeNewUser(database, c)
+			c.JSON(404, gin.H{"error": "User not found (not valid cookie)"})
+			return
+		}
+
+		if user.Password == "" {
+			c.JSON(404, gin.H{"error": "User have valid cookie, but TRIAL user"})
 			return
 		}
 		c.JSON(200, gin.H{"status": "OK", "data": gin.H{"username": user.Username}})

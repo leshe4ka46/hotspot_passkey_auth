@@ -8,11 +8,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/rs/zerolog/log"
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/db"
-	"hotspot_passkey_auth/store"
 	"io/ioutil"
 )
+
+func bytearreq(a, b []byte) bool {
+	for i, dat := range a {
+		if dat != b[i] {
+			return false
+		}
+	}
+	return true
+}
 
 func AssertionGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
@@ -30,16 +39,19 @@ func AssertionGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.H
 			return
 		}
 		var (
-			assertion *protocol.CredentialAssertion
-			data      *webauthn.SessionData
+			assertion   *protocol.CredentialAssertion
+			sessionData *webauthn.SessionData
 		)
-		if assertion, data, err = wba.BeginDiscoverableLogin(opts...); err != nil {
+		if assertion, sessionData, err = wba.BeginDiscoverableLogin(opts...); err != nil {
 			c.JSON(404, gin.H{"error": "Not found"})
 			return
 		}
-		fmt.Printf("data: %+v\n", data)
-		db_user.Webauthn = JSONString(data)
-		database.UpdateUser(db_user)
+		db_user.SessionData = JSONString(sessionData)
+		if err := database.UpdateUser(db_user); err != nil {
+			log.Error().Err(err).Msg("")
+			c.JSON(404, gin.H{"error": "DB err"})
+			return
+		}
 		c.JSON(200, gin.H{"status": "OK", "data": assertion})
 	}
 	return gin.HandlerFunc(fn)
@@ -75,40 +87,70 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 			c.JSON(404, gin.H{"error": "User not found"})
 			return
 		}
-		fmt.Printf("usr: %+v\n", db_user)
-		var user store.User
-		json.Unmarshal([]byte(db_user.WebauthnUser), &user)
+
 		var webauthnData webauthn.SessionData
-		json.Unmarshal([]byte(db_user.Webauthn), &webauthnData)
-		var credssignin []webauthn.Credential
-		json.Unmarshal([]byte(db_user.CredentialsSignIn), &credssignin)
-		if credential, err = wba.ValidateDiscoverableLogin(func(_, userHandle []byte) (_ webauthn.User, err error) {
-			fmt.Println("userHandle:", userHandle)
+		json.Unmarshal([]byte(db_user.SessionData), &webauthnData)
+
+		if credential, err = wba.ValidateDiscoverableLogin(func(_, userHandle []byte) (webauthn.User, error) {
+			fmt.Println("userHandle:", string(userHandle))
 			db_user, err = database.GetUserByUsername(string(userHandle))
 			if err != nil {
-				return &store.User{}, errors.New("user not found")
+				return &User{}, errors.New("user not found")
 			}
-			asserting_user := &store.User{
+			var creds []webauthn.Credential
+			for _, cred := range db_user.Creds {
+				creds = append(creds, cred.ToCredentials())
+			}
+			asserting_user := &User{
 				ID:          string(db_user.Username),
 				Name:        string(userHandle),
 				DisplayName: string(userHandle),
+				Credentials: creds,
 			}
-			json.Unmarshal([]byte(db_user.Credentials), &asserting_user.Credentials)
 			return asserting_user, nil
 		}, webauthnData, parsedResponse); err != nil {
-			c.JSON(404, gin.H{"error": "User not found"})
+			c.JSON(404, gin.H{"error": "ValidateDiscoverableLogin error"})
+			log.Error().Err(err).Msg("ValidateDiscoverableLogin error")
 			return
 		}
 		var macData MacFromAssertion
 		json.Unmarshal(postData, &macData)
-		credssignin = append(credssignin, *credential)
-		db_user.CredentialsSignIn = JSONString(credssignin)
+
+		var found = false
+		for i, cred := range db_user.Creds {
+			if bytearreq(cred.PublicKey, (*credential).PublicKey) {
+				db_user.Creds[i] = db.ToWaData(*credential,db_user.Id)
+				if err := database.UpdateCred(db_user.Creds[i]); err != nil {
+					log.Error().Err(err).Msg("")
+					c.JSON(404, gin.H{"error": "DB err"})
+					return
+				}
+				found = true
+				break;
+			}
+		}
+		if !found {
+			db_user.Creds = append(db_user.Creds, db.ToWaData(*credential,db_user.Id))
+		}
 		db_user.Mac = db.AddStr(db_user.Mac, macData.Mac)
-		db_user.Cookies = db.AddStr(db_user.Cookies, cookie)
-		database.UpdateUser(db_user)
-		database.DelByCookie(cookie)
-		c.SetCookie(consts.LoginCookieName, db.GetFirst(db_user.Cookies), consts.CookieLifeTime, "/", consts.CookieDomain, false, true)
-		database.AddMacRadcheck(macData.Mac)
+		db_user.Cookies = append(db_user.Cookies, db.CookieData{Cookie: cookie})
+		db_user.Creds = []db.WebauthnData{}; // manually updated creds in upper code, because save method just adds new)
+		if err := database.UpdateUser(db_user); err != nil {
+			log.Error().Err(err).Msg("")
+			c.JSON(404, gin.H{"error": "DB err"})
+			return
+		}
+		if err := database.DelUserByCookie(cookie); err != nil {
+			log.Error().Err(err).Msg("")
+			c.JSON(404, gin.H{"error": "DB err"})
+			return
+		}
+		//c.SetCookie(consts.LoginCookieName, db.GetFirst(db_user.Cookies), consts.CookieLifeTime, "/", consts.CookieDomain, false, true)
+		// if err := database.AddMacRadcheck(macData.Mac); err != nil {
+		// 	log.Error().Err(err).Msg("")
+		// 	c.JSON(404, gin.H{"error": "DB err"})
+		// 	return
+		// }
 		c.JSON(200, gin.H{"status": "OK"})
 	}
 	return gin.HandlerFunc(fn)

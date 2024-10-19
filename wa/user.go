@@ -1,11 +1,11 @@
-package store
+package wa
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
+	// "crypto/ecdsa"
+	// "crypto/elliptic"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/tstranex/u2f"
+	// "github.com/tstranex/u2f"
 )
 
 type User struct {
@@ -14,7 +14,6 @@ type User struct {
 	DisplayName       string                `json:"display_name"`
 	Icon              string                `json:"icon,omitempty"`
 	Credentials       []webauthn.Credential `json:"credentials,omitempty"`
-	CredentialsSignIn []webauthn.Credential `json:"credentials_sign_in,omitempty"`
 }
 
 func (u User) WebAuthnHasU2F() bool {
@@ -57,25 +56,25 @@ func (u User) WebAuthnCredentialDescriptors() (descriptors []protocol.Credential
 	return descriptors
 }
 
-func (u User) U2FRegistrations() (registrations []u2f.Registration) {
-	registrations = []u2f.Registration{}
+// func (u User) U2FRegistrations() (registrations []u2f.Registration) {
+// 	registrations = []u2f.Registration{}
 
-	for _, credential := range u.Credentials {
-		if credential.AttestationType != "fido-u2f" {
-			continue
-		}
+// 	for _, credential := range u.Credentials {
+// 		if credential.AttestationType != "fido-u2f" {
+// 			continue
+// 		}
 
-		x, y := elliptic.Unmarshal(elliptic.P256(), credential.PublicKey)
+// 		x, y := elliptic.Unmarshal(elliptic.P256(), credential.PublicKey)
 
-		registrations = append(registrations, u2f.Registration{
-			KeyHandle: credential.ID,
-			PubKey: ecdsa.PublicKey{
-				Curve: elliptic.P256(),
-				X:     x,
-				Y:     y,
-			},
-		})
-	}
+// 		registrations = append(registrations, u2f.Registration{
+// 			KeyHandle: credential.ID,
+// 			PubKey: ecdsa.PublicKey{
+// 				Curve: elliptic.P256(),
+// 				X:     x,
+// 				Y:     y,
+// 			},
+// 		})
+// 	}
 
-	return registrations
-}
+// 	return registrations
+// }

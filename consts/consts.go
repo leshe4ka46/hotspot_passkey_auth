@@ -38,22 +38,18 @@ const AssertionPath = apiPath + "/webauthn/assertion"
 const AdminPath = apiPath + "/admin"
 
 func UpdConsts() {
-	tmp:=os.Getenv("MAC_EXPIRE_POLL_TIME")
-	if(tmp!=""){
+	if tmp:=os.Getenv("MAC_EXPIRE_POLL_TIME");tmp!=""{
 		MacExpirePollTime=toInt(tmp)
 	}
-	tmp=os.Getenv("COOKIE_LIFETIME")
-	if(tmp!=""){
+	if tmp:=os.Getenv("COOKIE_LIFETIME");tmp!=""{
 		CookieLifeTime=toInt(tmp)
 	}
-	tmp=os.Getenv("RADCHECK_LIFETIME")
-	if(tmp!=""){
+	if tmp:=os.Getenv("RADCHECK_LIFETIME");tmp!=""{
 		MacUserLifetime=int64(toInt(tmp))
 	}
-	tmp=os.Getenv("COOKIE_DOMAIN")
-	if(tmp!=""){
+	if tmp:=os.Getenv("COOKIE_DOMAIN");tmp!=""{
 		CookieDomain=tmp
 	}else{
-		log.Fatal("COOKIE_DOMAIN is not set")
+		log.Fatal("env param COOKIE_DOMAIN is not set")
 	}
 }
