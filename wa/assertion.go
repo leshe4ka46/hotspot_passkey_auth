@@ -119,22 +119,22 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 		var found = false
 		for i, cred := range db_user.Creds {
 			if bytearreq(cred.PublicKey, (*credential).PublicKey) {
-				db_user.Creds[i] = db.ToWaData(*credential,db_user.Id)
+				db_user.Creds[i] = db.ToWaData(*credential, db_user.Creds[i].Id)
 				if err := database.UpdateCred(db_user.Creds[i]); err != nil {
 					log.Error().Err(err).Msg("")
 					c.JSON(404, gin.H{"error": "DB err"})
 					return
 				}
 				found = true
-				break;
+				break
 			}
 		}
 		if !found {
-			db_user.Creds = append(db_user.Creds, db.ToWaData(*credential,db_user.Id))
+			db_user.Creds = append(db_user.Creds, db.ToWaData(*credential, db_user.Id))
 		}
 		db_user.Mac = db.AddStr(db_user.Mac, macData.Mac)
 		db_user.Cookies = append(db_user.Cookies, db.CookieData{Cookie: cookie})
-		db_user.Creds = []db.WebauthnData{}; // manually updated creds in upper code, because save method just adds new)
+		db_user.Creds = []db.WebauthnData{} // manually updated creds in upper code, because save method just adds new)
 		if err := database.UpdateUser(db_user); err != nil {
 			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "DB err"})

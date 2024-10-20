@@ -4,13 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/go-webauthn/webauthn/webauthn"
 	"hotspot_passkey_auth/consts"
 	"strings"
 	"time"
 
+	"github.com/go-webauthn/webauthn/webauthn"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type DB struct {
@@ -96,8 +98,9 @@ func (cred WebauthnData) ToCredentials() webauthn.Credential {
 	}
 }
 
-func ToWaData(data webauthn.Credential, gocheckuserid uint) WebauthnData {
+func ToWaData(data webauthn.Credential, id uint) WebauthnData {
 	return WebauthnData{
+		Id:              id,
 		CredentialID:    data.ID,
 		PublicKey:       data.PublicKey,
 		AttestationType: data.AttestationType,
@@ -105,7 +108,6 @@ func ToWaData(data webauthn.Credential, gocheckuserid uint) WebauthnData {
 		SignCount:       data.Authenticator.SignCount,
 		CloneWarning:    data.Authenticator.CloneWarning,
 		BackupEligible:  data.Flags.BackupEligible,
-		GocheckUserId:   gocheckuserid,
 	}
 }
 
@@ -182,7 +184,9 @@ func Connect(user, password, host, port, dbname string) (*DB, error) {
 
 func Oldconnect(user, password, host, port, dbname string) (db *gorm.DB, err error) {
 	dbAddress := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", user, password, host, port, dbname)
-	db, err = gorm.Open(postgres.Open(dbAddress))
+	db, err = gorm.Open(postgres.Open(dbAddress), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Error), // Set the logger in the GORM config
+	})
 	return
 }
 
@@ -195,7 +199,8 @@ func (p *DB) CheckUsernamePassword(username string, password string) (gocheck Go
 
 func (p *DB) UpdateCred(cred WebauthnData) error {
 	// return p.db.Save(&cred).Error
-	return p.db.Model(&cred).Where("id = ?", cred.Id).Updates(cred). // save does not recognise id if it is zero
+	return p.db.Model(&cred).Updates(cred). // save does not recognise id if it is zero
+		// Where("id = ?", cred.Id).
 		// Update("credential_id", cred.CredentialID).
 		// Update("public_key", cred.PublicKey).
 		// Update("attestation_type", cred.AttestationType).
