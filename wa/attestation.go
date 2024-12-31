@@ -7,7 +7,6 @@ import (
 	"hotspot_passkey_auth/utils"
 
 	"bytes"
-	_"encoding/json"
 	"io"
 
 	"github.com/gin-gonic/gin"
@@ -86,7 +85,6 @@ func AttestationPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gi
 			ID:          db_user.Username,
 			Name:        db_user.Username,
 			DisplayName: db_user.Username,
-			Icon:        "http://localhost:3000/icons8-website-32.png",
 		}
 
 		jsonData, err := io.ReadAll(c.Request.Body)
@@ -117,6 +115,7 @@ func AttestationPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gi
 			return
 		}
 		//database.AddMacRadcheck(db.GetMacByCookie(db_user.Mac,db_user.Cookies,cookie))
+		log.Info().Str("mac:", c.Query("mac")).Msg("")
 		c.JSON(200, gin.H{"status": "OK", "data": "ok"})
 	}
 	return gin.HandlerFunc(fn)

@@ -6,7 +6,6 @@ import (
 
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 
 	"github.com/gin-gonic/gin"
@@ -85,7 +84,7 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 			return
 		}
 		var db_user_key db.Gocheck
-		fmt.Printf("paesedresp: %+v\n", parsedResponse)
+		//fmt.Printf("paesedresp: %+v\n", parsedResponse)
 		if credential, err = wba.ValidateDiscoverableLogin(func(_, userHandle []byte) (webauthn.User, error) {
 			db_user_key, err = database.GetUserByUsername(string(userHandle))
 			if err != nil {
@@ -103,7 +102,7 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 			}
 			return asserting_user, nil
 		}, db_user_old.SessionData, parsedResponse); err != nil {
-			c.JSON(404, gin.H{"error": "ValidateDiscoverableLogin error"})
+			c.JSON(404, gin.H{"error": "key validating error"})
 			log.Error().Err(err).Msg("ValidateDiscoverableLogin error")
 			return
 		}
@@ -153,7 +152,7 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 			return
 		}
 
-		log.Info().Str("mac", c.Query("mac"))
+		log.Info().Str("mac:", c.Query("mac")).Msg("")
 		//c.SetCookie(consts.LoginCookieName, db.GetFirst(db_user.Cookies), consts.CookieLifeTime, "/", consts.CookieDomain, false, true)
 		// if err := database.AddMacRadcheck(macData.Mac); err != nil {
 		// 	log.Error().Err(err).Msg("")
