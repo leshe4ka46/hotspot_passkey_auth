@@ -33,6 +33,8 @@ jobs:
         registry: git.leshe4ka.ru
         username: ${{ secrets.USERNAME }}
         password: ${{ secrets.TOKEN }}
+    - name: Download dist
+      run: ./gitea_get_dist_release.sh
     - name: build docker image
       uses: docker/build-push-action@v5
       with:
