@@ -1,32 +1,22 @@
 package handlers
 
 import (
-	"encoding/base64"
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/db"
-	"math/rand"
-	"time"
+	"hotspot_passkey_auth/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
-	"github.com/twinj/uuid"
+	
 )
 
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-func RandStringRunes(n int) string {
-	rand.Seed(time.Now().UnixNano())
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(b)
-}
 
 func makeNewUser(database *db.DB, c *gin.Context) {
-	uid := base64.RawStdEncoding.EncodeToString(uuid.NewV4().Bytes())
-	c.SetCookie(consts.LoginCookieName, uid, consts.CookieLifeTime, "/", consts.CookieDomain, consts.SecureCookie, true)
-	if err := database.AddUser(&db.Gocheck{Cookies: []db.CookieData{{Cookie: uid}}, Username: RandStringRunes(64)}); err != nil {
+	uid := utils.NewUUIDV4()
+	cookie := utils.RandStringRunes(64)
+	c.SetCookie(consts.LoginCookieName, cookie, consts.CookieLifeTime, "/", consts.CookieDomain, consts.SecureCookie, true)
+	if err := database.AddUser(&db.Gocheck{Cookies: []db.CookieData{{Cookie: cookie}}, Username: uid, Id: uid}); err != nil {
 		log.Error().Err(err).Msg("")
 		c.JSON(404, gin.H{"error": "DB err"})
 		return

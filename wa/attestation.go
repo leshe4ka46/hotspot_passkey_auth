@@ -1,12 +1,14 @@
 package wa
 
 import (
+	"fmt"
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/db"
+	"hotspot_passkey_auth/utils"
 
 	"bytes"
-	"encoding/json"
-	"io/ioutil"
+	_"encoding/json"
+	"io"
 
 	"github.com/gin-gonic/gin"
 
@@ -56,7 +58,7 @@ func AttestationGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin
 		opts.Response.CredentialExcludeList = []protocol.CredentialDescriptor{}
 		opts.Response.Extensions = protocol.AuthenticationExtensions{"credProps": true}
 
-		db_user.SessionData = JSONString(data)
+		db_user.SessionData = *data
 		err = database.UpdateUser(db_user)
 		if err != nil {
 			log.Error().Err(err).Msg("")
@@ -84,12 +86,10 @@ func AttestationPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gi
 			ID:          db_user.Username,
 			Name:        db_user.Username,
 			DisplayName: db_user.Username,
+			Icon:        "http://localhost:3000/icons8-website-32.png",
 		}
 
-		var webauthnData webauthn.SessionData
-		json.Unmarshal([]byte(db_user.SessionData), &webauthnData)
-
-		jsonData, err := ioutil.ReadAll(c.Request.Body)
+		jsonData, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "Body not found"})
@@ -102,14 +102,15 @@ func AttestationPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gi
 			c.JSON(404, gin.H{"error": "Body parce error"})
 			return
 		}
-		cred, err := wba.CreateCredential(user, webauthnData, parsedResponse)
+		fmt.Printf("parsedResponse: %+v\n", parsedResponse)
+		cred, err := wba.CreateCredential(user, db_user.SessionData, parsedResponse)
 		if err != nil {
-			log.Error().Err(err).Msg("")
+			log.Error().Err(err).Msg("CreateCredential error")
 			c.JSON(404, gin.H{"error": "Could not create credential"})
 			return
 		}
-		db_user.Creds = append(db_user.Creds, db.ToWaData(*cred,db_user.Id))
-		db_user.SessionData = ""
+		db_user.Creds = append(db_user.Creds, db.ToWaData(*cred, utils.NewUUIDV4()))
+		db_user.SessionData = webauthn.SessionData{}
 		if err := database.UpdateUser(db_user); err != nil {
 			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "DB err"})

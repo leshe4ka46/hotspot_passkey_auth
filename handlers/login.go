@@ -40,7 +40,6 @@ func LoginHandler(database *db.DB) gin.HandlerFunc {
 			return
 		}
 		user.Cookies = append(user.Cookies, db.CookieData{Cookie: cookie})
-		user.Mac = db.AddStr(user.Mac, login.Mac)
 		if err := database.DelUserByCookie(cookie); err != nil {
 			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "DB err"})

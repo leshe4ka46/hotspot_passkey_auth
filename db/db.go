@@ -1,7 +1,6 @@
 package db
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"hotspot_passkey_auth/consts"
@@ -19,20 +18,6 @@ type DB struct {
 	db *gorm.DB
 }
 
-type Database interface {
-	CheckUsernamePassword(username string, password string) (gocheck Gocheck, err error)
-	AddUser(user *Gocheck) (err error)
-	GetUserByCookie(cookie string) (gocheck Gocheck, err error)
-	UpdateUser(gocheck Gocheck) (err error)
-	GetUserByUsername(uname string) (gocheck Gocheck, err error)
-	AddMacRadcheck(mac string) (err error)
-	DelUserByCookie(cookie string) (err error)
-	DelCookie(cookie string) (err error)
-	GetRadcheck() (res []Radacct, err error)
-	ExpireMacUsers() (err error)
-	UpdateCred(cred WebauthnData) error
-}
-
 type Radcheck struct {
 	Id          uint   `gorm:"primaryKey"`
 	Username    string `gorm:"type:varchar(64);uniqueIndex"`
@@ -47,12 +32,11 @@ func (Radcheck) TableName() string {
 }
 
 type Gocheck struct {
-	Id       uint   `gorm:"primaryKey"`
+	Id       string `gorm:"primaryKey"`
 	Username string `gorm:"type:varchar(64);uniqueIndex"`
 	Password string `gorm:"typce:varchar(64)"`
-	Mac      string
-	//Credentials  string
-	SessionData string
+
+	SessionData webauthn.SessionData `gorm:"serializer:json"`
 	IsAdmin     bool
 
 	Creds   []WebauthnData `gorm:"foreignKey:GocheckUserId"`
@@ -64,22 +48,26 @@ func (Gocheck) TableName() string {
 }
 
 type WebauthnData struct {
-	Id              uint `gorm:"primaryKey"`
-	Name            string
-	LowerName       string
-	UserID          int64
+	Id   string `gorm:"type:varchar(37);primaryKey"`
+	Name string `gorm:"type:varchar(64)"`
+	// LowerName       string
+	// UserID          int64
 	CredentialID    []byte `gorm:"size:1024"`
 	PublicKey       []byte `gorm:"uniqueIndex"`
-	AttestationType string
+	AttestationType string 
 	AAGUID          []byte
 	SignCount       uint32
 	CloneWarning    bool
 	BackupEligible  bool
-	CreatedUnix     time.Time // currently unused, was in gitea sources
-	UpdatedUnix     time.Time // currently unused, was in gitea sources
+	CreatedUnix     time.Time `gorm:"index;autoCreateTime"`
+	UpdatedUnix     time.Time `gorm:"index;autoUpdateTime"`
 
-	GocheckUserId uint
+	GocheckUserId string
 	User          Gocheck `gorm:"foreignKey:GocheckUserId;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+}
+
+func (WebauthnData) TableName() string {
+	return "webauthn-data"
 }
 
 func (cred WebauthnData) ToCredentials() webauthn.Credential {
@@ -98,7 +86,7 @@ func (cred WebauthnData) ToCredentials() webauthn.Credential {
 	}
 }
 
-func ToWaData(data webauthn.Credential, id uint) WebauthnData {
+func ToWaData(data webauthn.Credential, id string) WebauthnData {
 	return WebauthnData{
 		Id:              id,
 		CredentialID:    data.ID,
@@ -111,15 +99,11 @@ func ToWaData(data webauthn.Credential, id uint) WebauthnData {
 	}
 }
 
-func (WebauthnData) TableName() string {
-	return "webauthn-data"
-}
-
 type CookieData struct {
-	Id     uint   `gorm:"primaryKey"`
-	Cookie string `gorm:"type:string"`
+	//Id     string   `gorm:"primaryKey"`
+	Cookie string `gorm:"primaryKey"`
 
-	GocheckUserId uint
+	GocheckUserId string
 	User          Gocheck `gorm:"foreignKey:GocheckUserId;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 }
 
@@ -212,6 +196,11 @@ func (p *DB) UpdateCred(cred WebauthnData) error {
 }
 
 func (p *DB) UpdateUser(gocheck Gocheck) error {
+	// for _, cred := range gocheck.Creds {
+	// 	if err := p.UpdateCred(cred); err != nil {
+	// 		return err
+	// 	}
+	// }
 	err := p.db.Save(&gocheck).Error
 	return err
 }
@@ -250,6 +239,19 @@ func (p *DB) DelUserByCookie(cookie string) error {
 	return p.db.Delete(dat.User).Error
 }
 
+func (p *DB) DelUserByUsername(uname string) error {
+	var dat Gocheck
+	if err := p.db.Preload("Cookies").First(&dat, "username = ?", uname).Error; err != nil {
+		return err
+	}
+	for _, cookie := range dat.Cookies {
+		if err := p.db.Delete(cookie).Error; err != nil {
+			return err
+		}
+	}
+	return p.db.Delete(dat).Error
+}
+
 func (p *DB) DelCookie(cookie string) error {
 	return p.db.Delete(&CookieData{}, "cookie = ?", cookie).Error
 }
@@ -262,52 +264,4 @@ func (p *DB) GetRadcheck() (res []Radacct, err error) {
 func (p *DB) ExpireMacUsers() (err error) {
 	err = p.db.Where("created_time < ?", time.Now().Unix()-consts.MacUserLifetime).Delete(&Radcheck{}).Error
 	return
-}
-
-func AddStr(in string, mac string) (out string) {
-	var arr []string = []string{}
-	if in != "" {
-		json.Unmarshal([]byte(in), &arr)
-	}
-	arr = append(arr, mac)
-	outb, _ := json.Marshal(arr)
-	out = string(outb)
-	return
-}
-
-func RemoveStr(in string, mac string) (out string) {
-	var arr []string = []string{}
-	var outarr []string
-	if in != "" {
-		json.Unmarshal([]byte(in), &arr)
-	}
-	for _, el := range arr {
-		if el != mac {
-			outarr = append(outarr, el)
-		}
-	}
-	outb, _ := json.Marshal(outarr)
-	out = string(outb)
-	return
-}
-
-func GetFirst(in string) (out string) {
-	var arr []string = []string{}
-	if in == "" {
-		return ""
-	}
-	json.Unmarshal([]byte(in), &arr)
-	return arr[0]
-}
-
-func GetMacByCookie(m string, c string, cookie string) (mac string) {
-	var macs, cookies []string
-	json.Unmarshal([]byte(m), &macs)
-	json.Unmarshal([]byte(c), &cookies)
-	for i, c := range cookies {
-		if string(c) == cookie {
-			return macs[i]
-		}
-	}
-	return ""
 }
