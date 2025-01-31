@@ -116,6 +116,11 @@ func AttestationPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gi
 		}
 		//database.AddMacRadcheck(db.GetMacByCookie(db_user.Mac,db_user.Cookies,cookie))
 		log.Info().Str("mac:", c.Query("mac")).Msg("")
+		if err := database.AddMacRadcheck(c.Query("mac")); err != nil {
+			log.Error().Err(err).Msg("")
+			// c.JSON(404, gin.H{"error": "DB err"}) // may be duplicate error, ignore
+			// return
+		}
 		c.JSON(200, gin.H{"status": "OK", "data": "ok"})
 	}
 	return gin.HandlerFunc(fn)

@@ -1,0 +1,37 @@
+name: Deploy site to Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: https://gitea.com/actions/checkout@v4
+      - name: Setup Node
+        uses: https://gitea.com/actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm i
+      - name: Build
+        run: npm run build
+      - name: Deploy to Server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
+          SOURCE: "build"
+          REMOTE_HOST: ${{ secrets.SSH_HOST }}
+          REMOTE_USER: ${{ secrets.SSH_USER }}
+          REMOTE_PORT: ${{ secrets.SSH_PORT }}
+          TARGET_DIR: ${{ secrets.SSH_DIR }}
+        run: |
+          ./deploy.sh

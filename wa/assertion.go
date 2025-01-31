@@ -14,15 +14,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func bytearreq(a, b []byte) bool {
-	for i, dat := range a {
-		if dat != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
 func AssertionGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		var opts = []webauthn.LoginOption{
@@ -85,7 +76,7 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 		}
 		var db_user_key db.Gocheck
 		//fmt.Printf("paesedresp: %+v\n", parsedResponse)
-		if credential, err = wba.ValidateDiscoverableLogin(func(_, userHandle []byte) (webauthn.User, error) {
+		if _, credential, err = wba.ValidatePasskeyLogin(func(_, userHandle []byte) (webauthn.User, error) {
 			db_user_key, err = database.GetUserByUsername(string(userHandle))
 			if err != nil {
 				return &User{}, errors.New("user not found")
@@ -110,13 +101,13 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 		var found = false
 		var i int
 		for i, cred := range db_user_key.Creds {
-			if bytearreq(cred.PublicKey, (*credential).PublicKey) {
+			if bytes.Equal(cred.PublicKey, (*credential).PublicKey) {
 				db_user_key.Creds[i] = db.ToWaData(*credential, db_user_key.Creds[i].Id)
-				if err := database.UpdateCred(db_user_key.Creds[i]); err != nil {
-					log.Error().Err(err).Msg("")
-					c.JSON(404, gin.H{"error": "DB err"})
-					return
-				}
+				// if err := database.UpdateCred(db_user_key.Creds[i]); err != nil {
+				// 	log.Error().Err(err).Msg("")
+				// 	c.JSON(404, gin.H{"error": "DB err"})
+				// 	return
+				// }
 				found = true
 				break
 			}
@@ -125,6 +116,7 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 			i = len(db_user_key.Creds)
 			db_user_key.Creds = append(db_user_key.Creds, db.ToWaData(*credential, db_user_key.Id))
 		}
+		db_user_key.Creds[i].GocheckUserId = db_user_key.Id
 		if err := database.UpdateCred(db_user_key.Creds[i]); err != nil {
 			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "DB err"})
@@ -154,11 +146,11 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 
 		log.Info().Str("mac:", c.Query("mac")).Msg("")
 		//c.SetCookie(consts.LoginCookieName, db.GetFirst(db_user.Cookies), consts.CookieLifeTime, "/", consts.CookieDomain, false, true)
-		// if err := database.AddMacRadcheck(macData.Mac); err != nil {
-		// 	log.Error().Err(err).Msg("")
-		// 	c.JSON(404, gin.H{"error": "DB err"})
-		// 	return
-		// }
+		if err := database.AddMacRadcheck(c.Query("mac")); err != nil {
+			log.Error().Err(err).Msg("")
+			// c.JSON(404, gin.H{"error": "DB err"}) // may be duplicate error, ignore
+			//return
+		}
 		c.JSON(200, gin.H{"status": "OK"})
 	}
 	return gin.HandlerFunc(fn)

@@ -1,0 +1,33 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+/*
+body {
+  background: #a2a09b;
+  background: -webkit-linear-gradient(315deg, hsla(236.6, 0%, 53.52%, 1) 0, hsla(236.6, 0%, 53.52%, 0) 70%), -webkit-linear-gradient(65deg, hsla(220.75, 34.93%, 26.52%, 1) 10%, hsla(220.75, 34.93%, 26.52%, 0) 80%), -webkit-linear-gradient(135deg, hsla(46.42, 36.62%, 83.92%, 1) 15%, hsla(46.42, 36.62%, 83.92%, 0) 80%), -webkit-linear-gradient(205deg, hsla(191.32, 50.68%, 56.45%, 1) 100%, hsla(191.32, 50.68%, 56.45%, 0) 70%);
+  background: linear-gradient(135deg, hsla(236.6, 0%, 53.52%, 1) 0, hsla(236.6, 0%, 53.52%, 0) 70%), linear-gradient(25deg, hsla(220.75, 34.93%, 26.52%, 1) 10%, hsla(220.75, 34.93%, 26.52%, 0) 80%), linear-gradient(315deg, hsla(46.42, 36.62%, 83.92%, 1) 15%, hsla(46.42, 36.62%, 83.92%, 0) 80%), linear-gradient(245deg, hsla(191.32, 50.68%, 56.45%, 1) 100%, hsla(191.32, 50.68%, 56.45%, 0) 70%)
+}
+
+
+html {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: sans-serif, Arial
+}
+
+body,
+html {
+  min-height: 100%;
+  overflow-x: hidden
+}*/

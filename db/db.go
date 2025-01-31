@@ -1,10 +1,10 @@
 package db
 
 import (
+	"hotspot_passkey_auth/consts"
+
 	"errors"
 	"fmt"
-	"hotspot_passkey_auth/consts"
-	"strings"
 	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -12,6 +12,8 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type DB struct {
@@ -54,7 +56,7 @@ type WebauthnData struct {
 	// UserID          int64
 	CredentialID    []byte `gorm:"size:1024"`
 	PublicKey       []byte `gorm:"uniqueIndex"`
-	AttestationType string 
+	AttestationType string
 	AAGUID          []byte
 	SignCount       uint32
 	CloneWarning    bool
@@ -148,17 +150,20 @@ func (Radacct) TableName() string {
 }
 
 func Connect(user, password, host, port, dbname string) (*DB, error) {
-	db, err := Oldconnect(user, password, host, port, dbname)
+	dbAddress := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", user, password, host, port, dbname)
+	var verbosity logger.LogLevel
+	if consts.ReleaseBuild {
+		verbosity = logger.Silent
+	} else {
+		verbosity = logger.Info
+	}
+	db, err := gorm.Open(postgres.Open(dbAddress), &gorm.Config{
+		Logger: logger.Default.LogMode(verbosity), // Set the logger in the GORM config
+	})
 	if err != nil {
 		return nil, err
 	}
-	if err := db.AutoMigrate(&Gocheck{}, &WebauthnData{}, &CookieData{}); err != nil {
-		return nil, err
-	}
-	if err := db.AutoMigrate(&Radcheck{}); err != nil {
-		return nil, err
-	}
-	if err := db.AutoMigrate(&Radacct{}); err != nil {
+	if err := db.AutoMigrate(&Gocheck{}, &WebauthnData{}, &CookieData{}, &Radcheck{}); err != nil {
 		return nil, err
 	}
 	return &DB{
@@ -166,33 +171,30 @@ func Connect(user, password, host, port, dbname string) (*DB, error) {
 	}, nil
 }
 
-func Oldconnect(user, password, host, port, dbname string) (db *gorm.DB, err error) {
-	dbAddress := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", user, password, host, port, dbname)
-	db, err = gorm.Open(postgres.Open(dbAddress), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Error), // Set the logger in the GORM config
-	})
-	return
-}
-
-func (p *DB) CheckUsernamePassword(username string, password string) (gocheck Gocheck, err error) {
-	fields := []string{"username = ?", "password = ?"}
-	values := []interface{}{username, password}
-	err = p.db.Where(strings.Join(fields, " AND "), values...).First(&gocheck).Error
-	return
+func (p *DB) CheckUsernamePassword(username string, password string) (Gocheck, error) {
+	var user Gocheck
+	err := p.db.Where("username = ?", username).First(&user).Error
+	if err != nil {
+		return Gocheck{}, err
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		return Gocheck{}, err
+	}
+	return user, nil
 }
 
 func (p *DB) UpdateCred(cred WebauthnData) error {
-	// return p.db.Save(&cred).Error
-	return p.db.Model(&cred).Updates(cred). // save does not recognise id if it is zero
-		// Where("id = ?", cred.Id).
-		// Update("credential_id", cred.CredentialID).
-		// Update("public_key", cred.PublicKey).
-		// Update("attestation_type", cred.AttestationType).
-		// Update("aa_guid", cred.AAGUID).
-		// Update("sign_count", cred.SignCount).
-		// Update("clone_warning", cred.CloneWarning).
-		// Update("backup_eligible", cred.BackupEligible).
-		Error
+	return p.db.Save(&cred).Error
+	// return p.db.Model(&cred).Updates(cred). // save does not recognise id if it is zero
+	// 	// Where("id = ?", cred.Id).
+	// 	// Update("credential_id", cred.CredentialID).
+	// 	// Update("public_key", cred.PublicKey).
+	// 	// Update("attestation_type", cred.AttestationType).
+	// 	// Update("aa_guid", cred.AAGUID).
+	// 	// Update("sign_count", cred.SignCount).
+	// 	// Update("clone_warning", cred.CloneWarning).
+	// 	// Update("backup_eligible", cred.BackupEligible).
+	// 	Error
 }
 
 func (p *DB) UpdateUser(gocheck Gocheck) error {
@@ -201,8 +203,7 @@ func (p *DB) UpdateUser(gocheck Gocheck) error {
 	// 		return err
 	// 	}
 	// }
-	err := p.db.Save(&gocheck).Error
-	return err
+	return p.db.Save(&gocheck).Error
 }
 
 func (p *DB) GetUserByCookie(cookie string) (gocheck Gocheck, err error) {
@@ -212,7 +213,7 @@ func (p *DB) GetUserByCookie(cookie string) (gocheck Gocheck, err error) {
 	return
 }
 
-func (p *DB) AddMacRadcheck(mac string) (err error) {
+func (p *DB) AddMacRadcheck(mac string) error {
 	if mac == "" {
 		return errors.New("no mac passed")
 	}
@@ -224,7 +225,7 @@ func (p *DB) AddUser(user *Gocheck) (err error) {
 }
 
 func (p *DB) GetUserByUsername(uname string) (gocheck Gocheck, err error) {
-	err = p.db.Preload("Creds").First(&gocheck, "username = ?", uname).Error
+	err = p.db.Preload("Creds").Preload("Cookies").First(&gocheck, "username = ?", uname).Error
 	return
 }
 
@@ -233,19 +234,21 @@ func (p *DB) DelUserByCookie(cookie string) error {
 	if err := p.db.Preload("User").First(&dat, "cookie = ?", cookie).Error; err != nil {
 		return err
 	}
-	if err := p.db.Delete(dat).Error; err != nil {
-		return err
-	}
-	return p.db.Delete(dat.User).Error
+	return p.DelUserByUsername(dat.User.Username)
 }
 
 func (p *DB) DelUserByUsername(uname string) error {
 	var dat Gocheck
-	if err := p.db.Preload("Cookies").First(&dat, "username = ?", uname).Error; err != nil {
+	if err := p.db.Preload("Cookies").Preload("Creds").First(&dat, "username = ?", uname).Error; err != nil {
 		return err
 	}
 	for _, cookie := range dat.Cookies {
 		if err := p.db.Delete(cookie).Error; err != nil {
+			return err
+		}
+	}
+	for _, cred := range dat.Creds {
+		if err := p.db.Delete(cred).Error; err != nil {
 			return err
 		}
 	}

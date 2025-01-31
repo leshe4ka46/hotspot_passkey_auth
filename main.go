@@ -26,8 +26,10 @@ func ExpireUsers(database *db.DB) {
 	}
 }
 
-//go:embed dist
+//go:generate ./build.sh
+//go:embed web/build
 var fs embed.FS
+var basePath = "web/build/"
 
 func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
@@ -55,7 +57,7 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("")
 	}
-	r := server.InitServer(database, webauthn, &config, fs)
+	r := server.InitServer(database, webauthn, &config, fs, basePath)
 
 	go ExpireUsers(database)
 	log.Fatal().Stack().Err(server.StartServer(r)).Msg("")

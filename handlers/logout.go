@@ -26,11 +26,12 @@ func RemoveMacCookie(m string, c string, cookie string) (newm, newc string) {
 }
 
 func arrRemove(arr []db.CookieData, cookie string) (newarr []db.CookieData) {
-	for _, c := range arr {
-		if c.Cookie != cookie {
-			newarr = append(newarr, c)
-		}
-	}
+	for i, v := range arr {
+        if v.Cookie == cookie {
+            newarr = append(arr[:i], arr[i+1:]...)
+            break
+        }
+    }
 	return
 }
 
@@ -42,24 +43,18 @@ func LogoutHandler(database *db.DB) gin.HandlerFunc {
 			c.JSON(404, gin.H{"error": "User not found"})
 			return
 		}
-		user, err := database.GetUserByCookie(cookie)
+		_, err = database.GetUserByCookie(cookie)
 		if err != nil {
 			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "User not found"})
 			return
 		}
-		user.Cookies = arrRemove(user.Cookies, cookie)
 		if err := database.DelCookie(cookie); err != nil {
 			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "DB err"})
 			return
 		}
 		//user.Mac, user.Cookies = RemoveMacCookie(user.Mac, user.Cookies, cookie)
-		if err := database.UpdateUser(user); err != nil {
-			log.Error().Err(err).Msg("")
-			c.JSON(404, gin.H{"error": "DB err"})
-			return
-		}
 		c.SetCookie(consts.LoginCookieName, "", 0, "/", consts.CookieDomain, false, true)
 		c.JSON(200, gin.H{"status": "OK"})
 	}

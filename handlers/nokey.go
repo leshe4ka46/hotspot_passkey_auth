@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/db"
 
@@ -17,14 +16,19 @@ func NoKeysHandler(database *db.DB) gin.HandlerFunc {
 			c.JSON(404, gin.H{"error": "Cookie get err"})
 			return
 		}
-		db_user, err := database.GetUserByCookie(cookie)
+		_, err = database.GetUserByCookie(cookie)
 		if err != nil {
 			log.Error().Err(err).Msg("")
 			c.JSON(404, gin.H{"error": "DB err"})
 			return
 		}
-		fmt.Printf("%+v\n", db_user)
-		//database.AddMacRadcheck(db.GetMacByCookie(db_user.Mac,db_user.Cookies,cookie))
+
+		log.Info().Str("mac:", c.Query("mac")).Msg("")
+		if err := database.AddMacRadcheck(c.Query("mac")); err != nil {
+			log.Error().Err(err).Msg("")
+			// c.JSON(404, gin.H{"error": "DB err"}) // may be duplicate error, ignore
+			// return
+		}
 		c.JSON(200, gin.H{"status": "OK"})
 	}
 	return gin.HandlerFunc(fn)

@@ -25,7 +25,7 @@ func staticCacheMiddleware() gin.HandlerFunc {
 	}
 }
 
-func bindataHandler(fs embed.FS) gin.HandlerFunc {
+func bindataHandler(fs embed.FS, basePath string) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		path := c.Request.URL.Path
 		if path == "/" || path == "" {
@@ -33,9 +33,9 @@ func bindataHandler(fs embed.FS) gin.HandlerFunc {
 		} else {
 			path = path[1:]
 		}
-		data, err := fs.ReadFile("dist/" + path)
+		data, err := fs.ReadFile(basePath + path)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found", "path": path})
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found", "path": basePath + path})
 			return
 		}
 
@@ -48,10 +48,13 @@ func bindataHandler(fs embed.FS) gin.HandlerFunc {
 	return gin.HandlerFunc(fn)
 }
 
-func InitServer(database *db.DB, wba *webauthn.WebAuthn, cfg *wa.Config, fs embed.FS) *gin.Engine {
+func InitServer(database *db.DB, wba *webauthn.WebAuthn, cfg *wa.Config, fs embed.FS, basePath string) *gin.Engine {
+	if consts.ReleaseBuild {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	var router = gin.Default()
 	router.Use(staticCacheMiddleware())
-	router.NoRoute(bindataHandler(fs))
+	router.NoRoute(bindataHandler(fs, basePath))
 
 	router.GET(consts.InfoPath, handlers.InfoHandler(database))
 	router.POST(consts.LoginPath, handlers.LoginHandler(database))
