@@ -1,4 +1,6 @@
 # Auth in hotspot via passkeys
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fleshe4ka46%2Fhotspot_passkey_auth_server.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fleshe4ka46%2Fhotspot_passkey_auth_server?ref=badge_shield)
+
 
 ```
 docker run \
@@ -19,3 +21,6 @@ docker run \
 ```
 
 Sample configuration fot Mikrotik router is in `config.rsc` and `login.html` file
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fleshe4ka46%2Fhotspot_passkey_auth_server.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fleshe4ka46%2Fhotspot_passkey_auth_server?ref=badge_large)
