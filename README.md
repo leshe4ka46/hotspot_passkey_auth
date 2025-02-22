@@ -3,9 +3,10 @@
 ```
 docker run \
     -p 8080:8080 \
+    --add-host=host.docker.internal:host-gateway \
     -e DB_USER=postgres \
     -e DB_PASSWORD=admin \
-    -e DB_HOST=localhost \
+    -e DB_HOST=host.docker.internal \
     -e DB_PORT=5432 \
     -e DB_NAME=radius \
     -e WEBAUTHN_EXTERNAL_URL=http://localhost:8080 \

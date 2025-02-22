@@ -3,6 +3,9 @@ WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm i
 ADD web .
+ARG GIT_COMMIT
+ENV REACT_APP_VERSION=$GIT_COMMIT
+RUN if [ -z "$REACT_APP_VERSION" ]; then echo "REACT_APP_VERSION is not set or empty, halting build."; exit 1; fi
 RUN npm run build
 
 
