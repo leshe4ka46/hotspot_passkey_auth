@@ -43,9 +43,10 @@ export default function Login() {
   const [error, setError] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [errorText, setErrorText] = React.useState("");
-  const [mac, setMac] = React.useState(searchParams.get("mac")!);
+  const [mac] = React.useState(searchParams.get("mac")!);
   const [interval, setinterv] =
     React.useState<ReturnType<typeof setInterval>>();
+  const [showPasskeys, setShowPasskeys] = React.useState<boolean>(false);
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [loggedIn, setLoggedIn] = React.useState(false);
@@ -60,7 +61,7 @@ export default function Login() {
       radiusLogin(mac);
       setFinalStage(true);
     }
-  }, [loggedIn, isSecure, webauthnSupported]);
+  }, [loggedIn, isSecure, webauthnSupported, mac]);
 
   React.useEffect(() => {
     getInfo()
@@ -74,8 +75,11 @@ export default function Login() {
           }
         }
       })
-      .catch(console.log);
-  }, [loggedIn]);
+      .catch(console.log)
+      .finally(() => {
+        setShowPasskeys(true);
+      });
+  }, [loggedIn, isSecure, webauthnSupported, mac]);
   const assertionSuccess = (a: string) => {
     setUsername(a);
     setLoggedIn(true);
@@ -101,7 +105,7 @@ export default function Login() {
 
   React.useEffect(() => {
     setWebauthnSupported(isWebauthnSupported());
-
+    console.log("webauthn supported: " + isWebauthnSupported());
     /*(async () => {
       const wpa = await isWebauthnPlatformAuthenticatorAvailable();
       setPlatformAuthenticator(wpa);
@@ -127,8 +131,8 @@ export default function Login() {
       setError(false);
       setErrorText("");
     }
-    const success = await login(username, password, mac);
-    if (success) {
+    try {
+      await login(username, password, mac);
       setUsername(username);
       setError(false);
       setErrorText("");
@@ -137,9 +141,9 @@ export default function Login() {
         setFinalStage(true);
         radiusLogin(mac);
       }
-    } else {
+    } catch (e) {
       setError(true);
-      setErrorText("Неверный логин или пароль");
+      setErrorText((e as Error).message);
     }
   };
   const redirect = () => {
@@ -222,7 +226,6 @@ export default function Login() {
                   await logout();
                   setLoggedIn(false);
                   setFinalStage(false);
-                  await getInfo();
                 }}
                 color="inherit">
                 <LogoutIcon />
@@ -311,15 +314,17 @@ export default function Login() {
                     Вход с ключом
                   </Button>
                 ) : null}
-                <SecurityKey
-                  mac={mac}
-                  setFinalStage={setFinalStage}
-                  U2FSupported={u2fSupported}
-                  WebauthnSupported={webauthnSupported}
-                  LoggedIn={loggedIn}
-                  setBothUsername={assertionSuccess}
-                  isSecure={isSecure}
-                />
+                {showPasskeys && (
+                  <SecurityKey
+                    mac={mac}
+                    setFinalStage={setFinalStage}
+                    U2FSupported={u2fSupported}
+                    WebauthnSupported={webauthnSupported}
+                    LoggedIn={loggedIn}
+                    setBothUsername={assertionSuccess}
+                    isSecure={isSecure}
+                  />
+                )}
               </Box>
             ) : (
               <CircularProgress variant="determinate" value={progress} />
@@ -335,13 +340,14 @@ export default function Login() {
             alignItems: "center",
             textAlign: "center",
             mb: 0,
+            overflow: "hidden",
           }}>
           <Grid item>
             <Typography variant="caption" color="grey">
               App commit hash:{" "}
               <Link
                 href={
-                  "https://git.leshe4ka.ru/webauthn/server/src/commit/" +
+                  "https://git.leshe4ka.ru/leshe4ka/webauthn/-/tree/" +
                   process.env.REACT_APP_VERSION
                 }
                 color="inherit">

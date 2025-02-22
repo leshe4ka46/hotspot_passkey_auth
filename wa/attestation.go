@@ -22,13 +22,13 @@ func AttestationGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin
 		cookie, err := c.Cookie(consts.LoginCookieName)
 		if err != nil {
 			log.Info().Err(err).Msg("")
-			c.JSON(404, gin.H{"error": "Not found"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Not found"}))
 			return
 		}
 		db_user, err := database.GetUserByCookie(cookie)
 		if err != nil {
 			log.Error().Err(err).Msg("")
-			c.JSON(404, gin.H{"error": "Not found"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Not found"}))
 			return
 		}
 
@@ -47,7 +47,7 @@ func AttestationGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin
 		)
 		if err != nil {
 			log.Error().Err(err).Msg("")
-			c.JSON(404, gin.H{"error": "Not found"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Not found"}))
 			return
 		}
 
@@ -62,7 +62,7 @@ func AttestationGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin
 		if err != nil {
 			log.Error().Err(err).Msg("")
 		}
-		c.JSON(200, gin.H{"status": "OK", "data": opts})
+		c.JSON(200, utils.EncodeSuccess(opts))
 	}
 	return gin.HandlerFunc(fn)
 }
@@ -72,13 +72,13 @@ func AttestationPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gi
 		cookie, err := c.Cookie(consts.LoginCookieName)
 		if err != nil {
 			log.Info().Err(err).Msg("")
-			c.JSON(404, gin.H{"error": "Cookie not found"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Cookie not found"}))
 			return
 		}
 		db_user, err := database.GetUserByCookie(cookie)
 		if err != nil {
 			log.Error().Err(err).Msg("")
-			c.JSON(404, gin.H{"error": "User not found"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "User not found"}))
 			return
 		}
 		user := User{
@@ -90,38 +90,38 @@ func AttestationPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gi
 		jsonData, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			log.Error().Err(err).Msg("")
-			c.JSON(404, gin.H{"error": "Body not found"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Body not found"}))
 			return
 		}
 
 		parsedResponse, err := protocol.ParseCredentialCreationResponseBody(bytes.NewReader(jsonData))
 		if err != nil {
 			log.Error().Err(err).Msg("")
-			c.JSON(404, gin.H{"error": "Body parce error"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Body parse error"}))
 			return
 		}
 		fmt.Printf("parsedResponse: %+v\n", parsedResponse)
 		cred, err := wba.CreateCredential(user, db_user.SessionData, parsedResponse)
 		if err != nil {
 			log.Error().Err(err).Msg("CreateCredential error")
-			c.JSON(404, gin.H{"error": "Could not create credential"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Could not create credential"}))
 			return
 		}
 		db_user.Creds = append(db_user.Creds, db.ToWaData(*cred, utils.NewUUIDV4()))
 		db_user.SessionData = webauthn.SessionData{}
 		if err := database.UpdateUser(db_user); err != nil {
 			log.Error().Err(err).Msg("")
-			c.JSON(404, gin.H{"error": "DB err"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "DB err"}))
 			return
 		}
-		//database.AddMacRadcheck(db.GetMacByCookie(db_user.Mac,db_user.Cookies,cookie))
+
 		log.Info().Str("mac:", c.Query("mac")).Msg("")
 		if err := database.AddMacRadcheck(c.Query("mac")); err != nil {
 			log.Error().Err(err).Msg("")
-			// c.JSON(404, gin.H{"error": "DB err"}) // may be duplicate error, ignore
+			// c.JSON(500, utils.EncodeError(gin.H{"error": "DB err"})) // may be duplicate error, ignore
 			// return
 		}
-		c.JSON(200, gin.H{"status": "OK", "data": "ok"})
+		c.JSON(200, utils.EncodeSuccess(gin.H{}))
 	}
 	return gin.HandlerFunc(fn)
 }

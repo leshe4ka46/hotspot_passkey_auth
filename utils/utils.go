@@ -1,9 +1,10 @@
 package utils
 
 import (
-	"github.com/twinj/uuid"
 	"math/rand"
-	"encoding/json"
+
+	"github.com/gin-gonic/gin"
+	"github.com/twinj/uuid"
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -20,52 +21,18 @@ func NewUUIDV4() string {
 	return uuid.NewV4().String()
 }
 
-
-
-func AddStr(in string, mac string) (out string) {
-	var arr []string = []string{}
-	if in != "" {
-		json.Unmarshal([]byte(in), &arr)
+func EncodeError(err any) gin.H {
+	switch v := err.(type) {
+	case error:
+		return gin.H{"status": "error", "error": v.Error()}
+	case gin.H:
+		v["status"] = "error"
+		return v
+	default:
+		return gin.H{"status": "error", "error": v}
 	}
-	arr = append(arr, mac)
-	outb, _ := json.Marshal(arr)
-	out = string(outb)
-	return
 }
 
-func RemoveStr(in string, mac string) (out string) {
-	var arr []string = []string{}
-	var outarr []string
-	if in != "" {
-		json.Unmarshal([]byte(in), &arr)
-	}
-	for _, el := range arr {
-		if el != mac {
-			outarr = append(outarr, el)
-		}
-	}
-	outb, _ := json.Marshal(outarr)
-	out = string(outb)
-	return
-}
-
-func GetFirst(in string) (out string) {
-	var arr []string = []string{}
-	if in == "" {
-		return ""
-	}
-	json.Unmarshal([]byte(in), &arr)
-	return arr[0]
-}
-
-func GetMacByCookie(m string, c string, cookie string) (mac string) {
-	var macs, cookies []string
-	json.Unmarshal([]byte(m), &macs)
-	json.Unmarshal([]byte(c), &cookies)
-	for i, c := range cookies {
-		if string(c) == cookie {
-			return macs[i]
-		}
-	}
-	return ""
+func EncodeSuccess(data any) gin.H {
+	return gin.H{"status": "OK", "data": data};
 }

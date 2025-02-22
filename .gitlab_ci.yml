@@ -1,0 +1,4 @@
+include:
+  - project: internal/ci
+    file:
+      - /Auto-DevOps.gitlab-ci.yml

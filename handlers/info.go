@@ -7,10 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
-	
 )
-
-
 
 func makeNewUser(database *db.DB, c *gin.Context) {
 	uid := utils.NewUUIDV4()
@@ -18,7 +15,7 @@ func makeNewUser(database *db.DB, c *gin.Context) {
 	c.SetCookie(consts.LoginCookieName, cookie, consts.CookieLifeTime, "/", consts.CookieDomain, consts.SecureCookie, true)
 	if err := database.AddUser(&db.Gocheck{Cookies: []db.CookieData{{Cookie: cookie}}, Username: uid, Id: uid}); err != nil {
 		log.Error().Err(err).Msg("")
-		c.JSON(404, gin.H{"error": "DB err"})
+		c.JSON(500, utils.EncodeError(gin.H{"error": "DB err"}))
 		return
 	}
 }
@@ -29,22 +26,23 @@ func InfoHandler(database *db.DB) gin.HandlerFunc {
 		if err != nil {
 			log.Info().Err(err).Msg("")
 			makeNewUser(database, c)
-			c.JSON(404, gin.H{"error": "Cookie not found"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Cookie not found"}))
 			return
 		}
 		user, err := database.GetUserByCookie(cookie)
 		if err != nil {
 			log.Error().Err(err).Msg("")
 			makeNewUser(database, c)
-			c.JSON(404, gin.H{"error": "User not found (not valid cookie)"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "User not found (not valid cookie)"}))
 			return
 		}
 
 		if user.Password == "" {
-			c.JSON(404, gin.H{"error": "User have valid cookie, but TRIAL user"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "User not found"}))
 			return
 		}
-		c.JSON(200, gin.H{"status": "OK", "data": gin.H{"username": user.Username}})
+
+		c.JSON(200, utils.EncodeSuccess(gin.H{"username": user.Username, "admin": user.IsAdmin}))
 	}
 	return gin.HandlerFunc(fn)
 }

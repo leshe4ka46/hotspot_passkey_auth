@@ -20,16 +20,16 @@ export function toData<T>(resp: void | AxiosResponse<ServiceResponse<T>>): T | u
 export function hasServiceError<T>(resp: AxiosResponse<ServiceResponse<T>>) {
     const errResp = toErrorResponse(resp);
     if (errResp && errResp.status === "error") {
-        return { errored: true, message: errResp.message };
+        return { errored: true, message: errResp.error };
     }
     return { errored: false, message: null };
 }
 
 export async function getInfo(): Promise<Info | undefined> {
-    try {
-        const response = await axios.get<ServiceResponse<Info>>(InfoPath).catch((err) => { console.log(err) });
-        return toData<Info>(response);
-    } catch (e) {
-        console.log(e)
+    var response = await axios.get<ServiceResponse<Info>>(InfoPath);
+    var error = hasServiceError(response);
+    if (response.status !== 200 || error.errored) {
+        throw new Error("Error getting info: " + error.message);
     }
+    return toData<Info>(response);
 }

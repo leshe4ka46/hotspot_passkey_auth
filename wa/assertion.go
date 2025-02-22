@@ -3,6 +3,7 @@ package wa
 import (
 	"hotspot_passkey_auth/consts"
 	"hotspot_passkey_auth/db"
+	"hotspot_passkey_auth/utils"
 
 	"bytes"
 	"errors"
@@ -21,12 +22,12 @@ func AssertionGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.H
 		}
 		cookie, err := c.Cookie(consts.LoginCookieName)
 		if err != nil {
-			c.JSON(404, gin.H{"error": "Cookie not found"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Cookie not found"}))
 			return
 		}
 		db_user, err := database.GetUserByCookie(cookie)
 		if err != nil {
-			c.JSON(404, gin.H{"error": "User not found"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "User not found"}))
 			return
 		}
 		var (
@@ -34,16 +35,16 @@ func AssertionGet(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.H
 			sessionData *webauthn.SessionData
 		)
 		if assertion, sessionData, err = wba.BeginDiscoverableLogin(opts...); err != nil {
-			c.JSON(404, gin.H{"error": "Not found"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Not found"}))
 			return
 		}
 		db_user.SessionData = *sessionData
 		if err := database.UpdateUser(db_user); err != nil {
 			log.Error().Err(err).Msg("")
-			c.JSON(404, gin.H{"error": "DB err"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "DB err"}))
 			return
 		}
-		c.JSON(200, gin.H{"status": "OK", "data": assertion})
+		c.JSON(200, utils.EncodeSuccess(assertion))
 	}
 	return gin.HandlerFunc(fn)
 }
@@ -57,21 +58,21 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 		)
 		postData, err := io.ReadAll(c.Request.Body)
 		if err != nil {
-			c.JSON(404, gin.H{"error": "Body not found"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Body not found"}))
 			return
 		}
 		if parsedResponse, err = protocol.ParseCredentialRequestResponseBody(bytes.NewReader(postData)); err != nil {
-			c.JSON(404, gin.H{"error": "Error parsing body"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Error parsing body"}))
 			return
 		}
 		cookie, err := c.Cookie(consts.LoginCookieName)
 		if err != nil {
-			c.JSON(404, gin.H{"error": "Cookie not found"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Cookie not found"}))
 			return
 		}
 		db_user_old, err := database.GetUserByCookie(cookie)
 		if err != nil {
-			c.JSON(404, gin.H{"error": "User not found"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "User not found"}))
 			return
 		}
 		var db_user_key db.Gocheck
@@ -93,7 +94,7 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 			}
 			return asserting_user, nil
 		}, db_user_old.SessionData, parsedResponse); err != nil {
-			c.JSON(404, gin.H{"error": "key validating error"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "key validating error"}))
 			log.Error().Err(err).Msg("ValidateDiscoverableLogin error")
 			return
 		}
@@ -105,7 +106,7 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 				db_user_key.Creds[i] = db.ToWaData(*credential, db_user_key.Creds[i].Id)
 				// if err := database.UpdateCred(db_user_key.Creds[i]); err != nil {
 				// 	log.Error().Err(err).Msg("")
-				// 	c.JSON(404, gin.H{"error": "DB err"})
+				// 	c.JSON(500, utils.EncodeError(gin.H{"error": "DB err"}))
 				// 	return
 				// }
 				found = true
@@ -119,7 +120,7 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 		db_user_key.Creds[i].GocheckUserId = db_user_key.Id
 		if err := database.UpdateCred(db_user_key.Creds[i]); err != nil {
 			log.Error().Err(err).Msg("")
-			c.JSON(404, gin.H{"error": "DB err"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "DB err"}))
 			return
 		}
 		db_user_key.Creds = []db.WebauthnData{}
@@ -130,17 +131,17 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 		db_user_key.SessionData = webauthn.SessionData{}
 		if err := database.UpdateUser(db_user_key); err != nil {
 			log.Error().Err(err).Msg("")
-			c.JSON(404, gin.H{"error": "DB err"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "DB err"}))
 			return
 		}
 		if credential.Authenticator.CloneWarning {
-			c.JSON(404, gin.H{"error": "Key may be cloned one, restart auth with credentials"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "Key may be cloned one, restart auth with credentials"}))
 			log.Error().Err(err).Msg("CloneWarning == true")
 			return
 		}
 		if err := database.DelUserByUsername(db_user_old.Username); err != nil {
 			log.Error().Err(err).Msg("")
-			c.JSON(404, gin.H{"error": "DB err"})
+			c.JSON(500, utils.EncodeError(gin.H{"error": "DB err"}))
 			return
 		}
 
@@ -148,10 +149,10 @@ func AssertionPost(database *db.DB, wba *webauthn.WebAuthn, config *Config) gin.
 		//c.SetCookie(consts.LoginCookieName, db.GetFirst(db_user.Cookies), consts.CookieLifeTime, "/", consts.CookieDomain, false, true)
 		if err := database.AddMacRadcheck(c.Query("mac")); err != nil {
 			log.Error().Err(err).Msg("")
-			// c.JSON(404, gin.H{"error": "DB err"}) // may be duplicate error, ignore
+			// c.JSON(500, utils.EncodeError(gin.H{"error": "DB err"}) // may be duplicate error, ignore
 			//return
 		}
-		c.JSON(200, gin.H{"status": "OK"})
+		c.JSON(200, utils.EncodeSuccess(gin.H{}))
 	}
 	return gin.HandlerFunc(fn)
 }

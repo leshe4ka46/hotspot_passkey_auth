@@ -14,9 +14,11 @@ import {
     PublicKeyCredentialRequestOptionsJSON,
     PublicKeyCredentialRequestOptionsStatus
 } from '../models/Webauthn';
-import axios, { AxiosResponse } from "axios";
+import axios from "axios";
 import { OptionalDataServiceResponse, ServiceResponse, SignInResponse } from "../models/API";
 import { AssertionPath, AttestationPath } from "../constants/API";
+
+import { hasServiceError, toData } from './APIService';
 
 export function isWebauthnSecure(): boolean {
     if (window.isSecureContext) {
@@ -43,7 +45,7 @@ function arrayBufferEncode(value: ArrayBuffer): string {
 }
 
 function arrayBufferDecode(value: string): ArrayBuffer {
-    return getBytesFromBase64(value);
+    return getBytesFromBase64(value).buffer;
 }
 
 function decodePublicKeyCredentialDescriptor(descriptor: PublicKeyCredentialDescriptorJSON): PublicKeyCredentialDescriptor {
@@ -158,7 +160,7 @@ function getAttestationResultFromDOMException(exception: DOMException): Attestat
         case 'ConstraintError':
             return AttestationResult.FailureUserVerificationOrResidentKey;
         default:
-            console.error(`Unhandled DOMException occurred during WebAuthN attestation: ${exception}`);
+            console.log(`Unhandled DOMException occurred during WebAuthN attestation: ${exception}`);
             return AttestationResult.FailureUnknown;
     }
 }
@@ -181,53 +183,38 @@ function getAssertionResultFromDOMException(exception: DOMException, requestOpti
                 return AssertionResult.FailureUnknownSecurity;
             }
         default:
-            console.error(`Unhandled DOMException occurred during WebAuthN assertion: ${exception}`);
+            console.log(`Unhandled DOMException occurred during WebAuthN assertion: ${exception}`);
             return AssertionResult.FailureUnknown;
     }
 }
 
 async function getAttestationCreationOptions(): Promise<PublicKeyCredentialCreationOptionsStatus> {
-    try {
-        let response = await axios.get<ServiceResponse<CredentialCreation>>(AttestationPath);
 
-        if (response.data.status !== "OK" || response.data.data == null) {
-            return {
-                status: response.status,
-            };
-        }
-
-        return {
-            options: decodePublicKeyCredentialCreationOptions(response.data.data.publicKey),
-            status: response.status,
-        };
-    } catch (error) {
-        console.error("Failed to fetch attestation creation options:", error);
-        return {
-            status: 500
-        };
+    var response = await axios.get<ServiceResponse<CredentialCreation>>(AttestationPath);
+    var error = hasServiceError(response);
+    if (response.status !== 200 || error.errored) {
+        throw new Error("Error: " + error.message);
     }
+
+    const data = toData<CredentialCreation>(response);
+    return {
+        options: decodePublicKeyCredentialCreationOptions(data?.publicKey!),
+        status: response.status,
+    };
 }
 
 async function getAssertionRequestOptions(): Promise<PublicKeyCredentialRequestOptionsStatus> {
-    try {
-        let response = await axios.get<ServiceResponse<CredentialRequest>>(AssertionPath);
-
-        if (response.data.status !== "OK" || response.data.data == null) {
-            return {
-                status: response.status,
-            }
-        }
-
-        return {
-            options: decodePublicKeyCredentialRequestOptions(response.data.data.publicKey),
-            status: response.status,
-        };
-    } catch (error) {
-        console.error("Failed to fetch assertion creation options:", error);
-        return {
-            status: 500
-        };
+    var response = await axios.get<ServiceResponse<CredentialRequest>>(AssertionPath);
+    var error = hasServiceError(response);
+    if (response.status !== 200 || error.errored) {
+        throw new Error("Error: " + error.message);
     }
+
+    const data = toData<CredentialRequest>(response);
+    return {
+        options: decodePublicKeyCredentialRequestOptions(data?.publicKey!),
+        status: response.status,
+    };
 }
 
 async function getAttestationPublicKeyCredentialResult(creationOptions: PublicKeyCredentialCreationOptions): Promise<AttestationPublicKeyCredentialResult> {
@@ -263,13 +250,10 @@ async function getAssertionPublicKeyCredentialResult(conditional: boolean, reque
     const result: AssertionPublicKeyCredentialResult = {
         result: AssertionResult.Success,
     };
-    if (conditional) {
-        console.log(abortController)
-    }
     try {
         result.credential = (await navigator.credentials.get({
             ...(conditional ? { signal: abortController.signal } : {}),
-            mediation: (conditional ? 'conditional' : 'optional') as CredentialMediationRequirement,
+            mediation: (conditional ? "conditional" : "optional") as CredentialMediationRequirement,
             publicKey: requestOptions
         })) as PublicKeyCredential;
     } catch (e) {
@@ -294,16 +278,26 @@ async function getAssertionPublicKeyCredentialResult(conditional: boolean, reque
     return result;
 }
 
-async function postAttestationPublicKeyCredentialResult(credential: AttestationPublicKeyCredential, mac: string): Promise<AxiosResponse<OptionalDataServiceResponse<any>>> {
+async function postAttestationPublicKeyCredentialResult(credential: AttestationPublicKeyCredential, mac: string) {
     const credentialJSON = encodeAttestationPublicKeyCredential(credential);
 
-    return axios.post<OptionalDataServiceResponse<any>>(AttestationPath, credentialJSON, { params: { mac } });
+    var response = await axios.post<ServiceResponse<OptionalDataServiceResponse<any>>>(AttestationPath, credentialJSON, { params: { mac } });
+    var error = hasServiceError(response);
+    if (response.status !== 200 || error.errored) {
+        throw new Error("Error: " + error.message);
+    }
+    return toData<OptionalDataServiceResponse<any>>(response);
 }
 
 async function postAssertionPublicKeyCredentialResult(credential: PublicKeyCredential, mac: string) {
     const credentialJSON = encodeAssertionPublicKeyCredential(credential);
 
-    return axios.post<ServiceResponse<SignInResponse>>(AssertionPath, credentialJSON, { params: { mac } });
+    var response = await axios.post<ServiceResponse<SignInResponse>>(AssertionPath, credentialJSON, { params: { mac } })
+    var error = hasServiceError(response);
+    if (response.status !== 200 || error.errored) {
+        throw new Error("Error: " + error.message);
+    }
+    return toData<SignInResponse>(response);
 }
 
 export async function performAttestationCeremony(mac: string): Promise<AttestationResult> {
@@ -321,35 +315,34 @@ export async function performAttestationCeremony(mac: string): Promise<Attestati
         return AttestationResult.Failure;
     }
 
-    const response = await postAttestationPublicKeyCredentialResult(attestationResult.credential, mac);
-
-    if (response.data.status === "OK" && (response.status === 200 || response.status === 201)) {
-        return AttestationResult.Success;
-    }
-
-    return AttestationResult.Failure;
+    await postAttestationPublicKeyCredentialResult(attestationResult.credential, mac);
+    return AttestationResult.Success;
 }
 
 export async function performAssertionCeremony(conditional: boolean, mac: string, req: PublicKeyCredentialRequestOptions | undefined, setReq: React.Dispatch<React.SetStateAction<PublicKeyCredentialRequestOptions | undefined>>, abortController: AbortController): Promise<AssertionResult> {
 
-    const assertionRequestOpts = req === undefined ? await getAssertionRequestOptions() : { options: req, status: 200 };
-
+    const assertionRequestOpts = (req === undefined) ? await getAssertionRequestOptions() : { options: req, status: 200 };
     if (assertionRequestOpts.status !== 200 || assertionRequestOpts.options == null) {
         return AssertionResult.Failure;
     }
 
+    setReq(assertionRequestOpts.options);
+    console.log("setreq", assertionRequestOpts.options);
     const assertionResult = await getAssertionPublicKeyCredentialResult(conditional, assertionRequestOpts.options, abortController);
-    setReq(undefined);
     if (assertionResult.result !== AssertionResult.Success) {
         return assertionResult.result;
     } else if (assertionResult.credential == null) {
         return AssertionResult.Failure;
     }
+    setReq(undefined);
+    await postAssertionPublicKeyCredentialResult(assertionResult.credential, mac);
+    return AssertionResult.Success;
+}
 
-    const response = await postAssertionPublicKeyCredentialResult(assertionResult.credential, mac);
-    if (response.data.status === "OK" && response.status === 200) {
-        return AssertionResult.Success;
-    }
+export async function performConditionalAssertionCeremony(mac: string, req: PublicKeyCredentialRequestOptions | undefined, setReq: React.Dispatch<React.SetStateAction<PublicKeyCredentialRequestOptions | undefined>>, abortController: AbortController): Promise<AssertionResult> {
+    return performAssertionCeremony(true, mac, req, setReq, abortController);
+}
 
-    return AssertionResult.Failure;
+export async function performOptionalAssertionCeremony(mac: string, req: PublicKeyCredentialRequestOptions | undefined, setReq: React.Dispatch<React.SetStateAction<PublicKeyCredentialRequestOptions | undefined>>, abortController: AbortController): Promise<AssertionResult> {
+    return performAssertionCeremony(false, mac, req, setReq, abortController);
 }

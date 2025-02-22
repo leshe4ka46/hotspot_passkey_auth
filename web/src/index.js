@@ -8,6 +8,10 @@ import "@fontsource/roboto/500.css"; // Import the font for font-weight: 500
 import "@fontsource/roboto/700.css"; // Import the font for font-weight: 700
 import { ThemeContextProvider } from "./utils/ThemeContext";
 
+import axios from "axios";
+
+axios.defaults.validateStatus = (status) => true; // Allow all HTTP status codes
+
 console.log("Mode:", process.env.NODE_ENV);
 if (process.env.NODE_ENV === "production") {
   console.log = () => {};

@@ -1,6 +1,6 @@
 export interface ErrorResponse {
     status: "error";
-    message: string;
+    error: string;
 }
 
 export interface Response<T> {
@@ -20,5 +20,4 @@ export type SignInResponse = { redirect: string } | undefined;
 export interface LoginBody {
     username: string;
     password: string;
-    mac: string;
 }
